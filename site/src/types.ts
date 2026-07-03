@@ -59,6 +59,22 @@ export interface BatteryData {
   };
 }
 
+export interface AgentData {
+  model: string;
+  n: number;
+  pass_rate: number;
+  by_type: Record<string, { n: number; passed: number; pass_rate: number }>;
+  grading: string;
+  examples: {
+    type: string;
+    question: string;
+    answer: string;
+    gold: string;
+    passed: boolean;
+    tools_used: string[];
+  }[];
+}
+
 export interface HealthData {
   generated_at: string;
   series: Record<

@@ -6,12 +6,18 @@ frontend types mirror this module.
 """
 
 import json
+import re
 from datetime import UTC, datetime
 from pathlib import Path
 
 import pandas as pd
 
 from gridscout.smard.filters import SERIES, Kind
+
+
+def _round_long_floats(text: str) -> str:
+    """Display hygiene: '15.253157140946763' -> '15.25' inside gold strings."""
+    return re.sub(r"\d+\.\d{4,}", lambda m: f"{float(m.group()):.2f}", text)
 
 GENERATION_ORDER = [
     # stack order for the mix chart: baseload-ish bottom, volatile top
@@ -128,6 +134,38 @@ def export_battery(reports_dir: Path) -> dict:
     }
 
 
+def export_agent(reports_dir: Path, examples_per_type: int = 2) -> dict:
+    """Agent eval summary + curated example transcripts for the dashboard."""
+    report = json.loads((reports_dir / "agent_eval.json").read_text())
+    examples: list[dict] = []
+    seen: dict[str, int] = {}
+    # prefer one pass and one fail per type so the page shows real behavior,
+    # not a highlight reel
+    for want_pass in (True, False):
+        for r in report["results"]:
+            key = f"{r['type']}-{want_pass}"
+            if r["passed"] is want_pass and seen.get(key, 0) < examples_per_type // 2 + 1:
+                seen[key] = seen.get(key, 0) + 1
+                examples.append(
+                    {
+                        "type": r["type"],
+                        "question": r["question"],
+                        "answer": r["answer"],
+                        "gold": _round_long_floats(r["gold"]),
+                        "passed": r["passed"],
+                        "tools_used": [c["tool"] for c in r["tool_calls"]],
+                    }
+                )
+    return {
+        "model": report["model"],
+        "n": report["n"],
+        "pass_rate": report["pass_rate"],
+        "by_type": report["by_type"],
+        "grading": report["grading"],
+        "examples": examples,
+    }
+
+
 def export_health(data_dir: Path) -> dict:
     """Freshness per series — the dashboard's pipeline-health panel."""
     series = {}
@@ -157,6 +195,7 @@ def export_site_data(data_dir: Path, reports_dir: Path, out_dir: Path) -> list[s
         "market.json": lambda: export_market(data_dir),
         "forecast.json": lambda: export_forecast(reports_dir),
         "battery.json": lambda: export_battery(reports_dir),
+        "agent.json": lambda: export_agent(reports_dir),
         "health.json": lambda: export_health(data_dir),
     }
     for filename, builder in exports.items():

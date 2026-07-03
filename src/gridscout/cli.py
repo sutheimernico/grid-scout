@@ -104,6 +104,27 @@ def battery_backtest(
     typer.echo(json.dumps(out, indent=2))
 
 
+@app.command("agent-eval")
+def agent_eval(
+    data_dir: DataDirOpt = Path("data"),
+    reports_dir: Annotated[Path, typer.Option(help="Report directory")] = Path("reports"),
+    model: Annotated[str, typer.Option(help="Ollama model")] = "qwen2.5:7b",
+) -> None:
+    """Run the agent eval set against a local Ollama model (requires ollama serve)."""
+    from gridscout.agent.evaluation import run_eval
+    from gridscout.agent.loop import GridAgent
+    from gridscout.agent.tools import GridTools
+
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+    tools = GridTools(data_dir=data_dir, reports_dir=reports_dir)
+    agent = GridAgent(tools=tools, model=model)
+    report = run_eval(agent, tools, reports_dir)
+    typer.echo(
+        f"pass rate: {report['pass_rate']:.0%} ({report['passed']}/{report['n']}) — "
+        + ", ".join(f"{k}: {v['passed']}/{v['n']}" for k, v in report["by_type"].items())
+    )
+
+
 @app.command("export-site")
 def export_site(
     data_dir: DataDirOpt = Path("data"),
