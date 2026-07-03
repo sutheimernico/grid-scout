@@ -4,7 +4,9 @@ version = "0.1.0"
 description = "Self-operating German electricity-market intelligence: SMARD ingestion, day-ahead price forecasting, battery arbitrage backtest, local agent with evals"
 requires-python = ">=3.11"
 dependencies = [
+    "holidays>=0.99",
     "httpx>=0.27",
+    "lightgbm>=4.6.0",
     "pandas>=2.2",
     "pyarrow>=17",
     "pydantic>=2.8",
