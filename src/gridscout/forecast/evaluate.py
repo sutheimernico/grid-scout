@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 
 from gridscout.forecast.features import (
     DAY_AHEAD_SERIES,
@@ -29,7 +30,9 @@ class EvalConfig:
     seed: int = 42
 
 
-def evaluate(data_dir: Path, config: EvalConfig | None = None) -> dict:
+def evaluate(data_dir: Path, config: EvalConfig | None = None) -> tuple[dict, pd.DataFrame]:
+    """Returns (report, predictions). Predictions carry every model's forecast
+    per hour of the eval period — the battery backtest consumes them."""
     config = config or EvalConfig()
     raw = load_series_frame(data_dir, RAW_SERIES)
     matrix = build_matrix(raw)
@@ -43,6 +46,13 @@ def evaluate(data_dir: Path, config: EvalConfig | None = None) -> dict:
     results = {m.name: run_walkforward(matrix, m, folds) for m in point_models}
     q10 = run_walkforward(matrix, LightGBMPrice(quantile=0.1, seed=config.seed), folds)
     q90 = run_walkforward(matrix, LightGBMPrice(quantile=0.9, seed=config.seed), folds)
+
+    predictions = results["lgbm_point"][["local_day", "hour_local", "target"]].copy()
+    predictions["pred_point"] = results["lgbm_point"]["prediction"]
+    predictions["pred_naive"] = results["naive_yesterday"]["prediction"]
+    predictions["pred_snaive7"] = results["seasonal_naive_7d"]["prediction"]
+    predictions["pred_q10"] = q10["prediction"]
+    predictions["pred_q90"] = q90["prediction"]
 
     report: dict = {
         "generated_utc": datetime.now(UTC).isoformat(timespec="seconds"),
@@ -77,7 +87,7 @@ def evaluate(data_dir: Path, config: EvalConfig | None = None) -> dict:
         "lgbm_vs_seasonal_naive_pct": round(100 * (1 - lgbm / snaive), 1),
     }
     report["finding"] = _verdict(report)
-    return report
+    return report, predictions
 
 
 def _verdict(report: dict) -> str:
@@ -107,10 +117,13 @@ def _verdict(report: dict) -> str:
     )
 
 
-def write_report(report: dict, reports_dir: Path) -> Path:
+def write_report(report: dict, predictions: pd.DataFrame, reports_dir: Path) -> Path:
     reports_dir.mkdir(parents=True, exist_ok=True)
     path = reports_dir / "forecast_eval.json"
     path.write_text(json.dumps(report, indent=2, default=_json_default) + "\n")
+    predictions.assign(local_day=predictions["local_day"].astype(str)).to_parquet(
+        reports_dir / "predictions.parquet"
+    )
     return path
 
 

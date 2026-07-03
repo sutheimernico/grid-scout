@@ -53,10 +53,55 @@ def forecast_eval(
     from gridscout.forecast.evaluate import EvalConfig, evaluate, write_report
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
-    report = evaluate(data_dir, EvalConfig(eval_days=eval_days, step_days=step_days))
-    path = write_report(report, reports_dir)
+    report, predictions = evaluate(data_dir, EvalConfig(eval_days=eval_days, step_days=step_days))
+    path = write_report(report, predictions, reports_dir)
     typer.echo(f"report written: {path}")
     typer.echo(report["finding"])
+
+
+@app.command("battery-backtest")
+def battery_backtest(
+    reports_dir: Annotated[Path, typer.Option(help="Report directory")] = Path("reports"),
+    power_mw: Annotated[float, typer.Option(help="Battery power")] = 1.0,
+    capacity_mwh: Annotated[float, typer.Option(help="Battery capacity")] = 2.0,
+    efficiency: Annotated[float, typer.Option(help="Round-trip efficiency")] = 0.86,
+) -> None:
+    """Battery arbitrage on walk-forward predictions (needs forecast-eval first)."""
+    import json
+
+    import pandas as pd
+
+    from gridscout.battery.backtest import run_backtest
+    from gridscout.battery.schedule import Battery
+
+    predictions_path = reports_dir / "predictions.parquet"
+    if not predictions_path.exists():
+        raise typer.BadParameter(f"{predictions_path} missing — run forecast-eval first")
+    predictions = pd.read_parquet(predictions_path)
+    predictions["local_day"] = pd.to_datetime(predictions["local_day"]).dt.date
+
+    actual = predictions.rename(columns={"target": "price"})
+    battery = Battery(
+        power_mw=power_mw, capacity_mwh=capacity_mwh, round_trip_efficiency=efficiency
+    )
+    result = run_backtest(
+        actual[["local_day", "hour_local", "price"]],
+        actual.assign(price=predictions["pred_point"])[["local_day", "hour_local", "price"]],
+        battery,
+    )
+    out = {
+        "battery": {
+            "power_mw": power_mw,
+            "capacity_mwh": capacity_mwh,
+            "round_trip_efficiency": efficiency,
+        },
+        **result.summary,
+    }
+    (reports_dir / "battery_backtest.json").write_text(json.dumps(out, indent=2) + "\n")
+    result.daily.assign(local_day=result.daily["local_day"].astype(str)).to_parquet(
+        reports_dir / "battery_daily.parquet"
+    )
+    typer.echo(json.dumps(out, indent=2))
 
 
 if __name__ == "__main__":
