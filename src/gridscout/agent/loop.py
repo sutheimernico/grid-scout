@@ -40,13 +40,23 @@ def _ollama_tool_schema() -> list[dict]:
     def prop(desc: str) -> dict:
         return {"type": "string", "description": desc}
 
+    day_param = {"day": prop("ISO date YYYY-MM-DD")}
     specs = [
-        ("get_price_day", "Hourly German day-ahead prices for one day (EUR/MWh): hourly values, mean, min/max with hour, negative-price hours.", {"day": prop("ISO date YYYY-MM-DD")}),
-        ("get_price_range_summary", "Price stats (mean/min/max/negative hours) over an inclusive day range, max 400 days.", {"start_day": prop("ISO date"), "end_day": prop("ISO date")}),
-        ("get_generation_mix_day", "Generation per source for one day (MWh) and renewables share.", {"day": prop("ISO date YYYY-MM-DD")}),
-        ("explain_price_context", "Why prices were high/low on a day: residual-load correlation, cheapest and priciest hours.", {"day": prop("ISO date YYYY-MM-DD")}),
-        ("get_forecast_evaluation", "Out-of-sample evaluation of the price forecast vs baselines (MAE, RMSE, skill).", {}),
-        ("get_battery_results", "Battery arbitrage backtest: revenue model/naive/perfect, capture rates.", {}),
+        ("get_price_day",
+         "Hourly German day-ahead prices for one day (EUR/MWh): hourly values, mean, "
+         "min/max with hour, negative-price hours.", day_param),
+        ("get_price_range_summary",
+         "Price stats (mean/min/max/negative hours) over an inclusive day range, max 400 days.",
+         {"start_day": prop("ISO date"), "end_day": prop("ISO date")}),
+        ("get_generation_mix_day",
+         "Generation per source for one day (MWh) and renewables share.", day_param),
+        ("explain_price_context",
+         "Why prices were high/low on a day: residual-load correlation, cheapest and "
+         "priciest hours.", day_param),
+        ("get_forecast_evaluation",
+         "Out-of-sample evaluation of the price forecast vs baselines (MAE, RMSE, skill).", {}),
+        ("get_battery_results",
+         "Battery arbitrage backtest: revenue model/naive/perfect, capture rates.", {}),
         ("get_data_coverage", "Which data series exist and their date coverage.", {}),
     ]
     return [

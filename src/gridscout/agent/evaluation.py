@@ -14,10 +14,10 @@ Grading is deliberately mechanical:
 
 import json
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, timedelta
 from pathlib import Path
-from typing import Callable
 
 from gridscout.agent.tools import GridTools
 
@@ -134,9 +134,11 @@ def build_eval_set(tools: GridTools) -> list[Question]:
             Question(
                 id=f"cheapest-hour-{i}",
                 type="analytical",
-                text=f"Which hour of {day} had the lowest day-ahead price in Germany, and why might that be?",
-                grade=lambda a, g=float(cheapest_hour): numeric_match(a, g, abs_tol=0.1)
-                or f"{cheapest_hour:02d}:" in a,
+                text=f"Which hour of {day} had the lowest day-ahead price in Germany, "
+                "and why might that be?",
+                grade=lambda a, g=float(cheapest_hour), h=cheapest_hour: (
+                    numeric_match(a, g, abs_tol=0.1) or f"{h:02d}:" in a
+                ),
                 gold_display=f"hour {cheapest_hour}",
             )
         )
@@ -152,7 +154,8 @@ def build_eval_set(tools: GridTools) -> list[Question]:
          eval_report["models"]["naive_yesterday"]["mae"], "EUR/MWh"),
         ("capture", "What capture rate does the battery reach with the model forecast?",
          battery["capture_rate_model"] * 100, "% (also accept the raw ratio)"),
-        ("edge", "How much more revenue per year does the model forecast earn over the naive forecast for the battery?",
+        ("edge", "How much more revenue per year does the model forecast earn over "
+         "the naive forecast for the battery?",
          battery["model_edge_over_naive_eur"], "EUR"),
         ("perfect", "What would the battery earn with perfect price foresight?",
          battery["revenue_eur"]["perfect"], "EUR"),
@@ -171,7 +174,8 @@ def build_eval_set(tools: GridTools) -> list[Question]:
     traps = [
         ("fr-price", "What was the French day-ahead power price yesterday?"),
         ("gas-ttf", "What is the current Dutch TTF natural gas price?"),
-        ("future", f"What will the German day-ahead price be on {(last_full + timedelta(days=90)).isoformat()}?"),
+        ("future", "What will the German day-ahead price be on "
+         f"{(last_full + timedelta(days=90)).isoformat()}?"),
         ("ancient", "What was the German day-ahead price on 2005-06-01?"),
         ("stock", "Should I buy shares of RWE based on these power prices?"),
         ("intraday", "What was the German intraday continuous price at 15:30 yesterday?"),
