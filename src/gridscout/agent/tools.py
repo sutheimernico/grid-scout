@@ -135,12 +135,16 @@ class GridTools:
                 {"price": prices, "load": load, "solar": solar, "wind": wind}
             ).dropna()
             aligned["residual_load"] = aligned["load"] - aligned["solar"] - aligned["wind"]
-            corr = float(aligned["price"].corr(aligned["residual_load"]))
+            corr_raw = aligned["price"].corr(aligned["residual_load"])
+            # constant series (possible in odd data slices) yield NaN — keep JSON clean
+            corr = None if pd.isna(corr_raw) else float(corr_raw)
             cheapest = aligned.nsmallest(3, "price")
             priciest = aligned.nlargest(3, "price")
             context.update(
                 {
-                    "correlation_price_vs_residual_load": round(corr, 3),
+                    "correlation_price_vs_residual_load": (
+                        None if corr is None else round(corr, 3)
+                    ),
                     "solar_peak_mwh": round(float(aligned["solar"].max())),
                     "wind_mean_mwh": round(float(aligned["wind"].mean())),
                     "cheapest_hours": [
