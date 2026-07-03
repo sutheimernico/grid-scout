@@ -7,7 +7,7 @@ on a feat/ branch, merge to main, progress log entry here.
 ## Phase status
 
 - [x] Phase 0 — Scaffold
-- [ ] Phase 1 — SMARD ingestion
+- [x] Phase 1 — SMARD ingestion (code done; live backfill validation pending)
 - [ ] Phase 2 — Forecast harness
 - [ ] Phase 3 — Battery arbitrage backtest
 - [ ] Phase 4 — Static dashboard
@@ -109,3 +109,10 @@ error rate — the 2026 differentiator.
 
 - 2026-07-03: Phase 0 done — repo scaffolded (uv, pytest, ruff, docs), SMARD API
   format verified live (4169 price, 410 load; weekly 168-point hourly JSON).
+- 2026-07-03: Phase 1 code done — all 19 filter IDs probed live (solar forecast
+  is 125, NOT the OpenAPI enum's 126 which is a negated aggregate; full history
+  since 2014-12-29). Client with disk cache + retry, incremental parquet ingest
+  (trailing-2-week refresh, revisions win, trailing nulls dropped, interior
+  nulls kept), structural validation. 17 tests, ruff clean, merged to main.
+  Live backfill (~3.5k requests) running; DST week-length assumption gets
+  verified by validation during that run.
