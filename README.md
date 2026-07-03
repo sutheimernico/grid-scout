@@ -93,7 +93,7 @@ weeks, and the eval-set builder walks past holes.
 
 ```bash
 uv sync
-uv run pytest                      # 72 tests
+uv run pytest                      # 74 tests
 uv run gridscout ingest            # SMARD → data/*.parquet (~10 min first time)
 uv run gridscout forecast-eval     # walk-forward eval (CPU, ~20-40 min)
 uv run gridscout battery-backtest  # needs forecast-eval artifacts
