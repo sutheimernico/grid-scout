@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 from pathlib import Path
 
-from gridscout.agent.tools import GridTools
+from gridscout.agent.tools import GridTools, ToolError
 
 NUMBER_RE = re.compile(r"-?\d[\d,.]*\d|-?\d")
 
@@ -71,11 +71,32 @@ class Question:
     gold_display: str
 
 
+def _usable_day(tools: GridTools, d: date) -> bool:
+    """A day is usable only if every tool the questions need can answer it.
+    Recent days can have holes (SMARD's price-settlement lag), so probe."""
+    try:
+        tools.get_price_day(d.isoformat())
+        tools.get_generation_mix_day(d.isoformat())
+        tools.explain_price_context(d.isoformat())
+        return True
+    except ToolError:
+        return False
+
+
 def build_eval_set(tools: GridTools) -> list[Question]:
-    """~30 questions anchored to days that certainly exist in the data."""
+    """~30 questions anchored to days verified to exist in the data."""
     coverage = tools.get_data_coverage()["series"]
     last_full = date.fromisoformat(coverage["gen_solar"]["to"]) - timedelta(days=2)
-    days = [last_full - timedelta(days=k) for k in (0, 7, 30, 90)]
+    days: list[date] = []
+    for offset in (0, 7, 30, 90):
+        candidate = last_full - timedelta(days=offset)
+        for _ in range(10):  # walk further back past data holes
+            if candidate not in days and _usable_day(tools, candidate):
+                days.append(candidate)
+                break
+            candidate -= timedelta(days=1)
+    if len(days) < 4:
+        raise RuntimeError("could not find 4 usable eval days — data too sparse")
 
     questions: list[Question] = []
 

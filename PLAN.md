@@ -9,10 +9,11 @@ on a feat/ branch, merge to main, progress log entry here.
 - [x] Phase 0 — Scaffold
 - [x] Phase 1 — SMARD ingestion (backfill done, validated, data current)
 - [x] Phase 2 — Forecast harness (code done; first real eval run pending)
-- [x] Phase 3 — Battery arbitrage backtest (code done; real run pending)
-- [ ] Phase 4 — Static dashboard
-- [ ] Phase 5 — GitHub: public repo, Actions pipeline, Pages, Issue alerts
-- [ ] Phase 6 — Agent + MCP server + evals
+- [x] Phase 3 — Battery arbitrage backtest (real run: capture 94.1%, edge +4,721 €/MW/y)
+- [x] Phase 4 — Static dashboard (built, screenshot-verified, palette validated)
+- [ ] Phase 5 — GitHub: BLOCKED on user running `gh repo create` (classifier denies
+      public-repo creation by agent); workflows ready on main
+- [x] Phase 6 — Agent + MCP server + evals (code done; first real eval running)
 - [ ] Phase 7 — Wow polish, docs, final verification
 
 ## Phase 1 — SMARD ingestion

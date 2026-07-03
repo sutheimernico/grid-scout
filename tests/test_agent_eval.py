@@ -85,3 +85,38 @@ def test_agent_rejects_unknown_tool(agent):
 def test_agent_survives_bad_arguments(agent):
     payload = agent._dispatch("get_price_day", {"nonsense": True})
     assert "bad arguments" in payload["error"]
+
+
+class TestEvalSetDaySelection:
+    def test_sparse_data_raises(self, tmp_path):
+        import numpy as np
+
+        from gridscout.agent.evaluation import build_eval_set
+        from tests.test_export import write_series
+
+        data = tmp_path / "d"
+        # only 4 days of data -> offsets 7/30/90 cannot find usable days
+        write_series(data, "price_day_ahead", np.ones(96), start_ms=1709247600000)
+        for name in ["load", "gen_solar", "gen_wind_onshore", "gen_wind_offshore"]:
+            write_series(data, name, np.ones(96), start_ms=1709247600000)
+        with pytest.raises(RuntimeError, match="usable eval days"):
+            build_eval_set(GridTools(data_dir=data, reports_dir=tmp_path))
+
+    def test_walks_past_holes(self, tmp_path):
+        from datetime import date
+
+        import numpy as np
+
+        from gridscout.agent.evaluation import _usable_day
+        from gridscout.agent.tools import GridTools as GT
+        from tests.test_export import write_series
+
+        data = tmp_path / "d"
+        values = np.ones(96 * 2)
+        values[96:144] = np.nan  # Mar 5-6 hole in prices
+        write_series(data, "price_day_ahead", values, start_ms=1709247600000)
+        for name in ["load", "gen_solar", "gen_wind_onshore", "gen_wind_offshore"]:
+            write_series(data, name, np.ones(96 * 2), start_ms=1709247600000)
+        tools = GT(data_dir=data, reports_dir=tmp_path)
+        assert not _usable_day(tools, date(2024, 3, 5))
+        assert _usable_day(tools, date(2024, 3, 4))
