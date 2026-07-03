@@ -1,7 +1,10 @@
 # grid-scout
 
+[![ci](https://github.com/sutheimernico/grid-scout/actions/workflows/ci.yml/badge.svg)](https://github.com/sutheimernico/grid-scout/actions/workflows/ci.yml)
+[![pipeline](https://github.com/sutheimernico/grid-scout/actions/workflows/pipeline.yml/badge.svg)](https://github.com/sutheimernico/grid-scout/actions/workflows/pipeline.yml)
+
 Self-operating German electricity-market intelligence system — built on a 0-€,
-GitHub-only stack.
+GitHub-only stack. **Live dashboard: <https://sutheimernico.github.io/grid-scout/>**
 
 > **Status: under construction.** This README grows with the project; see
 > [PROJECT.md](PROJECT.md) for the vision and [PLAN.md](PLAN.md) for build progress.

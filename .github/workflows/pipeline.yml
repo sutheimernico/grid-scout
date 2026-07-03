@@ -1,0 +1,108 @@
+name: pipeline
+
+# The self-operating loop: fetch fresh SMARD data, refresh artifacts, publish
+# the dashboard. Weekly (or on demand) the full walk-forward eval + battery
+# backtest rerun. Failures open/refresh a GitHub issue instead of failing silently.
+
+on:
+  schedule:
+    - cron: "47 */3 * * *" # ingest + publish, every 3 hours
+    - cron: "13 2 * * 1" # full eval, Monday 02:13 UTC
+  workflow_dispatch:
+    inputs:
+      full_eval:
+        description: "Run full walk-forward eval + battery backtest"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  issues: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pipeline
+  cancel-in-progress: false
+
+jobs:
+  pipeline:
+    runs-on: ubuntu-latest
+    outputs:
+      failed: ${{ steps.mark.outputs.failed }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+
+      - name: Decide whether this is a full-eval run
+        id: mode
+        run: |
+          FULL=false
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.full_eval }}" = "true" ]; then FULL=true; fi
+          if [ "${{ github.event.schedule }}" = "13 2 * * 1" ]; then FULL=true; fi
+          echo "full=$FULL" >> "$GITHUB_OUTPUT"
+
+      - run: uv sync --frozen
+
+      - name: Ingest SMARD data (incremental)
+        run: uv run gridscout ingest
+
+      - name: Full walk-forward eval + battery backtest
+        if: steps.mode.outputs.full == 'true'
+        run: |
+          uv run gridscout forecast-eval
+          uv run gridscout battery-backtest
+
+      - name: Export site artifacts
+        run: uv run gridscout export-site
+
+      - name: Commit refreshed data back to main
+        run: |
+          git config user.name "grid-scout pipeline"
+          git config user.email "actions@users.noreply.github.com"
+          git add data reports site/public/data
+          git diff --cached --quiet || git commit -m "chore(pipeline): refresh data artifacts [skip ci]"
+          git push origin HEAD:main
+
+      - name: Build site
+        working-directory: site
+        run: |
+          npm ci
+          npm run build
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site/dist
+
+  deploy:
+    needs: pipeline
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
+
+  alert-on-failure:
+    needs: [pipeline, deploy]
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Open or update pipeline-failure issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TITLE="Pipeline failure: scheduled run broke"
+          BODY="Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} (event: ${{ github.event_name }}, $(date -u +%Y-%m-%dT%H:%MZ))"
+          EXISTING=$(gh issue list --repo "${{ github.repository }}" --state open --search "in:title \"$TITLE\"" --json number --jq '.[0].number // empty')
+          if [ -n "$EXISTING" ]; then
+            gh issue comment "$EXISTING" --repo "${{ github.repository }}" --body "$BODY"
+          else
+            gh issue create --repo "${{ github.repository }}" --title "$TITLE" --body "$BODY" --label pipeline
+          fi
