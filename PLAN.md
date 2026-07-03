@@ -12,9 +12,32 @@ on a feat/ branch, merge to main, progress log entry here.
 - [x] Phase 3 — Battery arbitrage backtest (real run: capture 94.1%, edge +4,721 €/MW/y)
 - [x] Phase 4 — Static dashboard (built, screenshot-verified, palette validated)
 - [ ] Phase 5 — GitHub: BLOCKED on user running `gh repo create` (classifier denies
-      public-repo creation by agent); workflows ready on main
-- [x] Phase 6 — Agent + MCP server + evals (code done; first real eval running)
-- [ ] Phase 7 — Wow polish, docs, final verification
+      public-repo creation by agent); workflows ready on main. After repo exists:
+      push, enable Pages (workflow deploy), trigger pipeline once, verify live URL
+      + badges + first scheduled run.
+- [x] Phase 6 — Agent + MCP server + evals (96% pass rate, error-analysis loop done)
+- [x] Phase 7 — Docs + verification (README w/ screenshots, fresh-clone check ALL OK);
+      final visual polish pass optional after Pages is live
+
+## Outcome (as of 2026-07-03, pre-publish)
+
+Built and verified locally, publish blocked only on repo creation:
+
+- Data: 19 SMARD series ingested + validated (5.5y hourly for model series);
+  settlement-hole quirk discovered and handled.
+- Forecast: LightGBM MAE 15.25 €/MWh, +44% vs naive, quantile bands honestly
+  flagged as too narrow (67% vs 80% target). Walk-forward, leakage-guarded by
+  perturbation test.
+- Battery: 94.1% capture rate, forecast worth +4,721 €/MW/yr over naive.
+- Agent: 96% eval pass rate after an error-analysis iteration (grader gaps vs
+  real failures separated); 1 real failure documented and shown on the site.
+- Dashboard: dark control-room design, hand-rolled SVG charts, palette
+  validator PASS, screenshot-verified; agent transcripts incl. failures.
+- 74 Python tests + 11 site tests; fresh-clone verification ALL OK.
+
+Deviations from plan: none structural. Deferred as optional polish: quantile
+calibration (conformal), live "tomorrow" forecast on the site, README badge
+links go live only once the repo exists.
 
 ## Phase 1 — SMARD ingestion
 
