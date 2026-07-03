@@ -1,0 +1,1 @@
+{"root":["./src/App.tsx","./src/main.tsx","./src/types.ts","./src/charts/LineChart.tsx","./src/charts/StackedArea.tsx","./src/charts/scale.ts","./src/lib/useData.ts","./vite.config.ts"],"version":"5.9.3"}
