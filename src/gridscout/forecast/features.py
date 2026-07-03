@@ -51,12 +51,14 @@ def load_series_frame(data_dir: Path, names: list[str]) -> pd.DataFrame:
     return pd.DataFrame(columns).sort_index()
 
 
-def build_matrix(raw: pd.DataFrame) -> pd.DataFrame:
+def build_matrix(raw: pd.DataFrame, require_target: bool = True) -> pd.DataFrame:
     """Feature matrix + `target` column, indexed by UTC hour.
 
     raw: wide frame from load_series_frame containing TARGET, DAY_AHEAD_SERIES
-    and the keys of REALIZED_LAG_DAYS. Rows where the target or any feature is
-    missing are dropped (lags eat the first 7 days).
+    and the keys of REALIZED_LAG_DAYS. Rows with missing features are dropped
+    (lags eat the first 7 days). With require_target=False, rows whose target
+    is still unknown are kept — that is the inference case: tomorrow's
+    forecasts exist, tomorrow's price does not.
     """
     out = pd.DataFrame(index=raw.index)
     out["target"] = raw[TARGET]
@@ -80,7 +82,8 @@ def build_matrix(raw: pd.DataFrame) -> pd.DataFrame:
     )
     out["local_day"] = pd.Series(local.date, index=out.index)
 
-    feature_rows = out.drop(columns=["local_day"]).notna().all(axis=1)
+    drop_cols = ["local_day"] if require_target else ["local_day", "target"]
+    feature_rows = out.drop(columns=drop_cols).notna().all(axis=1)
     return out[feature_rows]
 
 

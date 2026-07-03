@@ -42,5 +42,22 @@ def ingest(
         typer.echo(f"{r.series}: {r.n_rows} rows ({r.weeks_fetched} weeks fetched){marker}")
 
 
+@app.command("forecast-eval")
+def forecast_eval(
+    data_dir: DataDirOpt = Path("data"),
+    reports_dir: Annotated[Path, typer.Option(help="Report output directory")] = Path("reports"),
+    eval_days: Annotated[int, typer.Option(help="Days in the eval window")] = 365,
+    step_days: Annotated[int, typer.Option(help="Refit cadence in days")] = 7,
+) -> None:
+    """Walk-forward evaluation: baselines vs LightGBM, honest report."""
+    from gridscout.forecast.evaluate import EvalConfig, evaluate, write_report
+
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+    report = evaluate(data_dir, EvalConfig(eval_days=eval_days, step_days=step_days))
+    path = write_report(report, reports_dir)
+    typer.echo(f"report written: {path}")
+    typer.echo(report["finding"])
+
+
 if __name__ == "__main__":
     app()
