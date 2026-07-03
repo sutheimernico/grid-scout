@@ -259,6 +259,54 @@ svg .direct-label {
   color: var(--ink-muted);
 }
 
+.transcript {
+  border-top: 1px solid var(--grid-hairline);
+  padding: 12px 0;
+  font-size: 13px;
+}
+.transcript:first-of-type {
+  border-top: none;
+}
+.transcript .t-q {
+  font-weight: 600;
+}
+.transcript .t-type {
+  color: var(--ink-muted);
+  font-family: var(--mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  margin-right: 4px;
+}
+.transcript .t-a {
+  color: var(--ink-2);
+  margin: 6px 0 4px;
+  padding-left: 12px;
+  border-left: 2px solid var(--baseline);
+  white-space: pre-wrap;
+}
+.transcript .t-meta {
+  color: var(--ink-muted);
+  font-size: 12px;
+  font-family: var(--mono);
+}
+.badge {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  border-radius: 4px;
+  padding: 1px 6px;
+  margin-right: 8px;
+  vertical-align: 1px;
+}
+.badge-pass {
+  color: var(--good);
+  border: 1px solid var(--good);
+}
+.badge-fail {
+  color: var(--critical);
+  border: 1px solid var(--critical);
+}
+
 .footer {
   margin-top: 72px;
   padding-top: 20px;

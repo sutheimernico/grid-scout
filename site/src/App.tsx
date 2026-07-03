@@ -1,7 +1,7 @@
 import { LineChart } from "./charts/LineChart";
 import { StackedArea } from "./charts/StackedArea";
 import { useArtifact } from "./lib/useData";
-import type { BatteryData, ForecastData, HealthData, MarketData } from "./types";
+import type { AgentData, BatteryData, ForecastData, HealthData, MarketData } from "./types";
 
 const COLORS = {
   model: "var(--s1)",
@@ -27,6 +27,7 @@ export default function App() {
   const market = useArtifact<MarketData>("market.json");
   const forecast = useArtifact<ForecastData>("forecast.json");
   const battery = useArtifact<BatteryData>("battery.json");
+  const agent = useArtifact<AgentData>("agent.json");
   const health = useArtifact<HealthData>("health.json");
 
   return (
@@ -272,6 +273,58 @@ export default function App() {
           </>
         ) : (
           <Pending what="battery backtest" state={battery.state} />
+        )}
+      </section>
+
+      <section className="section">
+        <div className="kicker">Agent</div>
+        <h2>A local LLM you can check the math on</h2>
+        <p className="sub">
+          A tool-calling agent (Ollama, runs on your machine — clone the repo, no cloud) answers
+          market questions grounded in the same data. It is <em>measured</em>, not demoed: every
+          answer is graded programmatically against tool output — numeric tolerance for facts,
+          refusal detection for trap questions it must decline. No LLM judge.
+        </p>
+        {agent.state === "ready" ? (
+          <>
+            <div className="tile-row">
+              <Tile
+                label="Overall pass rate"
+                value={(agent.data.pass_rate * 100).toFixed(0)}
+                unit="%"
+                hint={`${agent.data.n} questions · ${agent.data.model}, local`}
+              />
+              {Object.entries(agent.data.by_type).map(([type, s]) => (
+                <Tile
+                  key={type}
+                  label={`${type} questions`}
+                  value={`${s.passed}/${s.n}`}
+                  hint={type === "trap" ? "must decline, not invent" : "graded vs tool output"}
+                />
+              ))}
+            </div>
+            <div className="panel">
+              <p className="panel-title">Sample transcripts — including failures</p>
+              <p className="panel-sub">curated one pass + one fail per question type</p>
+              {agent.data.examples.map((ex, i) => (
+                <div className="transcript" key={i}>
+                  <div className="t-q">
+                    <span className={`badge ${ex.passed ? "badge-pass" : "badge-fail"}`}>
+                      {ex.passed ? "PASS" : "FAIL"}
+                    </span>
+                    <span className="t-type">{ex.type}</span> {ex.question}
+                  </div>
+                  <div className="t-a">{ex.answer || <em>(no final answer)</em>}</div>
+                  <div className="t-meta">
+                    gold: {ex.gold}
+                    {ex.tools_used.length > 0 && <> · tools: {ex.tools_used.join(", ")}</>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : (
+          <Pending what="agent evaluation" state={agent.state} />
         )}
       </section>
 
