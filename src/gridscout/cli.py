@@ -104,5 +104,18 @@ def battery_backtest(
     typer.echo(json.dumps(out, indent=2))
 
 
+@app.command("export-site")
+def export_site(
+    data_dir: DataDirOpt = Path("data"),
+    reports_dir: Annotated[Path, typer.Option(help="Report directory")] = Path("reports"),
+    out_dir: Annotated[Path, typer.Option(help="Site data directory")] = Path("site/public/data"),
+) -> None:
+    """Write dashboard JSON artifacts (skips exports whose inputs are missing)."""
+    from gridscout.export import export_site_data
+
+    written = export_site_data(data_dir, reports_dir, out_dir)
+    typer.echo(f"written: {', '.join(written) or '(nothing — no inputs found)'}")
+
+
 if __name__ == "__main__":
     app()
