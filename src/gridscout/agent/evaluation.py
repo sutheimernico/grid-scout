@@ -203,7 +203,7 @@ def build_eval_set(tools: GridTools) -> list[Question]:
         )
         questions.append(
             Question(id=f"report-{key}", type="report", text=text, grade=grade,
-                     gold_display=f"{gold} {unit}")
+                     gold_display=f"{round(gold, 2)} {unit}")
         )
 
     traps = [

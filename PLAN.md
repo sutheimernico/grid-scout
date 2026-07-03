@@ -108,6 +108,15 @@ error rate — the 2026 differentiator.
 
 ## Progress log
 
+- 2026-07-03: Phase 6 first real eval (qwen2.5:7b): 75% raw pass rate. Error
+  analysis: 5/7 failures were GRADER gaps (agent declined traps correctly with
+  phrasings the refusal heuristic missed), 2/7 real agent failures (declined
+  generation-mix questions without calling any tool — premature capitulation,
+  a known small-model tool-selection weakness). Fixed grader (+regression tests
+  from real transcripts), clarified tool description; rerun in progress. This
+  is the honest-evals story for README/site: measure the grader before trusting
+  it to measure the model.
+
 - 2026-07-03: Phase 0 done — repo scaffolded (uv, pytest, ruff, docs), SMARD API
   format verified live (4169 price, 410 load; weekly 168-point hourly JSON).
 - 2026-07-03: Phase 1 code done — all 19 filter IDs probed live (solar forecast

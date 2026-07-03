@@ -6,12 +6,18 @@ frontend types mirror this module.
 """
 
 import json
+import re
 from datetime import UTC, datetime
 from pathlib import Path
 
 import pandas as pd
 
 from gridscout.smard.filters import SERIES, Kind
+
+
+def _round_long_floats(text: str) -> str:
+    """Display hygiene: '15.253157140946763' -> '15.25' inside gold strings."""
+    return re.sub(r"\d+\.\d{4,}", lambda m: f"{float(m.group()):.2f}", text)
 
 GENERATION_ORDER = [
     # stack order for the mix chart: baseload-ish bottom, volatile top
@@ -145,7 +151,7 @@ def export_agent(reports_dir: Path, examples_per_type: int = 2) -> dict:
                         "type": r["type"],
                         "question": r["question"],
                         "answer": r["answer"],
-                        "gold": r["gold"],
+                        "gold": _round_long_floats(r["gold"]),
                         "passed": r["passed"],
                         "tools_used": [c["tool"] for c in r["tool_calls"]],
                     }
