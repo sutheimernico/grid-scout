@@ -7,9 +7,9 @@ on a feat/ branch, merge to main, progress log entry here.
 ## Phase status
 
 - [x] Phase 0 — Scaffold
-- [x] Phase 1 — SMARD ingestion (code done; live backfill validation pending)
-- [ ] Phase 2 — Forecast harness
-- [ ] Phase 3 — Battery arbitrage backtest
+- [x] Phase 1 — SMARD ingestion (backfill done, validated, data current)
+- [x] Phase 2 — Forecast harness (code done; first real eval run pending)
+- [x] Phase 3 — Battery arbitrage backtest (code done; real run pending)
 - [ ] Phase 4 — Static dashboard
 - [ ] Phase 5 — GitHub: public repo, Actions pipeline, Pages, Issue alerts
 - [ ] Phase 6 — Agent + MCP server + evals
@@ -116,3 +116,12 @@ error rate — the 2026 differentiator.
   nulls kept), structural validation. 17 tests, ruff clean, merged to main.
   Live backfill (~3.5k requests) running; DST week-length assumption gets
   verified by validation during that run.
+- 2026-07-03: Backfill complete + validated (5.5y deep series, 2.5y gen mix,
+  11 DST transitions clean). Found: SMARD hourly price has a rolling ~2-day
+  settlement hole behind tomorrow's auctioned prices (15-min market coupling);
+  ingest handles it (interior nulls kept, trailing refresh fills them).
+- 2026-07-03: Phase 2+3 code done — leakage-guarded feature matrix (perturbation
+  test enforces the availability contract), naive/seasonal-naive baselines,
+  LightGBM point+quantile, expanding walk-forward, eval report with rule-based
+  verdict; battery LP (exact, hand-computed test optima) with perfect/model/
+  naive schedules. First real eval running.
