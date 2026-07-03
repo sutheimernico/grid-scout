@@ -28,6 +28,20 @@ class TestGrading:
         assert refusal_like("There is no data for that date.")
         assert not refusal_like("The price was 96.8 EUR/MWh.")
 
+    @pytest.mark.parametrize(
+        "answer",
+        [
+            # real agent phrasings from the first eval run that the initial
+            # marker list missed (grader gap found via error analysis)
+            "There is no tool available to query French day-ahead power prices.",
+            "The tools provided do not include information about Dutch TTF gas prices.",
+            "None of the provided tools can answer for a specific time within an hour.",
+            "The provided tools do not cover EU ETS carbon certificate prices.",
+        ],
+    )
+    def test_refusal_detection_real_agent_phrasings(self, answer):
+        assert refusal_like(answer)
+
 
 class FakeOllama:
     """Scripted /api/chat responses: first a tool call, then a final answer."""

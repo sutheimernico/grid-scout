@@ -23,6 +23,10 @@ from gridscout.agent.tools import GridTools, ToolError
 
 NUMBER_RE = re.compile(r"-?\d[\d,.]*\d|-?\d")
 
+# Broadened after error analysis of the first real run: the agent declined
+# correctly with phrasings like "there is no tool available to ..." and
+# "the tools ... do not include/cover ...", which the initial list missed —
+# 5 of 7 apparent failures were grader gaps, not agent errors.
 REFUSAL_MARKERS = [
     "no data",
     "not available",
@@ -37,6 +41,16 @@ REFUSAL_MARKERS = [
     "only covers",
     "not in scope",
     "keine daten",
+    "no tool",
+    "none of the",
+    "not provide",
+    "do not provide",
+    "do not include",
+    "does not include",
+    "do not cover",
+    "does not cover",
+    "not able",
+    "not possible",
 ]
 
 

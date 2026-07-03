@@ -49,7 +49,9 @@ def _ollama_tool_schema() -> list[dict]:
          "Price stats (mean/min/max/negative hours) over an inclusive day range, max 400 days.",
          {"start_day": prop("ISO date"), "end_day": prop("ISO date")}),
         ("get_generation_mix_day",
-         "Generation per source for one day (MWh) and renewables share.", day_param),
+         "How much electricity each source (solar, wind, coal, gas, hydro, biomass, ...) "
+         "produced in Germany on one day (MWh per source), plus the renewables share.",
+         day_param),
         ("explain_price_context",
          "Why prices were high/low on a day: residual-load correlation, cheapest and "
          "priciest hours.", day_param),
