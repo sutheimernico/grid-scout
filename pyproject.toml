@@ -1,0 +1,39 @@
+[project]
+name = "gridscout"
+version = "0.1.0"
+description = "Self-operating German electricity-market intelligence: SMARD ingestion, day-ahead price forecasting, battery arbitrage backtest, local agent with evals"
+requires-python = ">=3.11"
+dependencies = [
+    "httpx>=0.27",
+    "pandas>=2.2",
+    "pyarrow>=17",
+    "pydantic>=2.8",
+    "typer>=0.12",
+]
+
+[project.scripts]
+gridscout = "gridscout.cli:app"
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "ruff>=0.6",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/gridscout"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

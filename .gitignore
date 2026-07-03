@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+dist/
+
+# Node (site/)
+node_modules/
+site/dist/
+
+# Local scratch — raw weekly JSON cache is regenerable, keep out of git
+.cache/
+
+# Env / secrets
+.env
+.env.*
+
+# OS
+.DS_Store
