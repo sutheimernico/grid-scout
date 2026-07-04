@@ -11,17 +11,23 @@ on a feat/ branch, merge to main, progress log entry here.
 - [x] Phase 2 — Forecast harness (code done; first real eval run pending)
 - [x] Phase 3 — Battery arbitrage backtest (real run: capture 94.1%, edge +4,721 €/MW/y)
 - [x] Phase 4 — Static dashboard (built, screenshot-verified, palette validated)
-- [ ] Phase 5 — GitHub: BLOCKED on user running `gh repo create` (classifier denies
-      public-repo creation by agent); workflows ready on main. After repo exists:
-      push, enable Pages (workflow deploy), trigger pipeline once, verify live URL
-      + badges + first scheduled run.
+- [x] Phase 5 — GitHub: repo public, Pages live at
+      https://sutheimernico.github.io/grid-scout/ (2026-07-04). CI + pipeline
+      badges passing; pipeline verified via manual dispatch incl. data-artifact
+      commit-back. First *scheduled* run still to be observed.
 - [x] Phase 6 — Agent + MCP server + evals (96% pass rate, error-analysis loop done)
 - [x] Phase 7 — Docs + verification (README w/ screenshots, fresh-clone check ALL OK);
       final visual polish pass optional after Pages is live
 
-## Outcome (as of 2026-07-03, pre-publish)
+## Outcome (as of 2026-07-04, published)
 
-Built and verified locally, publish blocked only on repo creation:
+Live at https://sutheimernico.github.io/grid-scout/ — repo, CI, scheduled
+pipeline with Pages deploy and issue-based failure alerts all verified.
+Publish notes: first `deploy-pages` attempt hit a transient failure (Pages
+enabled seconds earlier), fixed by rerun; `pipeline` issue label had to be
+created once in the fresh repo for the alert job.
+
+Built and verified locally before publish:
 
 - Data: 19 SMARD series ingested + validated (5.5y hourly for model series);
   settlement-hole quirk discovered and handled.
@@ -36,8 +42,7 @@ Built and verified locally, publish blocked only on repo creation:
 - 74 Python tests + 11 site tests; fresh-clone verification ALL OK.
 
 Deviations from plan: none structural. Deferred as optional polish: quantile
-calibration (conformal), live "tomorrow" forecast on the site, README badge
-links go live only once the repo exists.
+calibration (conformal), live "tomorrow" forecast on the site.
 
 ## Phase 1 — SMARD ingestion
 
