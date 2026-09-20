@@ -40,6 +40,12 @@ jobs:
       failed: ${{ steps.mark.outputs.failed }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The uptime calendar is derived from this repo's own commit history,
+          # which a shallow checkout cannot see. The export merges with the
+          # previously published calendar, so this is an optimisation, not a
+          # dependency — but with it the heatmap is correct from the first run.
+          fetch-depth: 0
       - uses: astral-sh/setup-uv@v5
       - uses: actions/setup-node@v4
         with:

@@ -7,8 +7,10 @@ frontend types mirror this module.
 
 import json
 import re
+import subprocess
+from collections import Counter
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 import pandas as pd
@@ -243,6 +245,100 @@ def export_report_health(reports_dir: Path) -> dict:
 
 LEDGER_DAYS_ON_SITE = 60
 
+# The pipeline's own commit-back message. Counting these per day is the only
+# self-recorded evidence of unattended operation that costs nothing to keep.
+BOT_COMMIT_SUBJECT = "chore(pipeline): refresh data artifacts"
+# Cron slots per day: 8 three-hourly runs + the daily pre-auction forecast run.
+SCHEDULED_RUNS_PER_DAY = 9
+
+
+def _git_run_days(repo_root: Path) -> dict[str, int]:
+    """UTC date -> number of pipeline commits, from git. {} if git cannot answer."""
+    try:
+        result = subprocess.run(
+            ["git", "log", "--fixed-strings", f"--grep={BOT_COMMIT_SUBJECT}", "--format=%cI"],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            timeout=120,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return {}
+    if result.returncode != 0:
+        return {}
+    stamps = [
+        datetime.fromisoformat(line).astimezone(UTC).date().isoformat()
+        for line in result.stdout.splitlines()
+        if line.strip()
+    ]
+    return dict(Counter(stamps))
+
+
+def export_uptime(repo_root: Path, previous: Path | None = None) -> dict:
+    """Runs per day since the pipeline went live — the heartbeat, as a calendar.
+
+    Two sources, merged by max(): git history (authoritative, but a shallow CI
+    checkout only sees the newest commit) and the previously exported artifact
+    (which the pipeline commits back, so it accumulates whatever git forgets).
+    Days with no run stay in the series at zero — a gap that is hidden is a lie.
+    """
+    counts = _git_run_days(repo_root)
+    if previous is not None and previous.exists():
+        try:
+            old_days = json.loads(previous.read_text()).get("days", [])
+        except json.JSONDecodeError:
+            old_days = []
+        for entry in old_days:
+            day, runs = entry["date"], int(entry["runs"])
+            counts[day] = max(counts.get(day, 0), runs)
+    if not counts:
+        raise FileNotFoundError("no pipeline history to build an uptime calendar from")
+
+    first = date.fromisoformat(min(counts))
+    last = max(date.fromisoformat(max(counts)), datetime.now(UTC).date())
+    days = []
+    cursor = first
+    while cursor <= last:
+        days.append({"date": cursor.isoformat(), "runs": counts.get(cursor.isoformat(), 0)})
+        cursor += timedelta(days=1)
+
+    active = sorted(d["runs"] for d in days if d["runs"] > 0)
+    # Colour reference is the median ACTIVE day, not the cron slot count: a run
+    # that finds no new SMARD data publishes nothing and leaves no commit, so
+    # scaling against 9 would paint a healthy pipeline as permanently pale.
+    reference = active[len(active) // 2] if active else 1
+
+    return {
+        "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
+        "source": (
+            "one cell per UTC day, counting the pipeline's own commit-back commits — "
+            "i.e. published refreshes, not attempted runs; a run that finds no new "
+            "SMARD data commits nothing. Merged with the previously published "
+            "calendar so a shallow CI clone cannot lose history."
+        ),
+        "scheduled_runs_per_day": SCHEDULED_RUNS_PER_DAY,
+        "reference_runs_per_day": reference,
+        "first_day": first.isoformat(),
+        "days": days,
+        "totals": {
+            "days": len(days),
+            "runs": sum(d["runs"] for d in days),
+            "days_with_a_run": len(active),
+            "days_with_zero_runs": len(days) - len(active),
+            "longest_silent_streak_days": _longest_zero_streak(days),
+            "median_runs_per_active_day": reference,
+        },
+    }
+
+
+def _longest_zero_streak(days: list[dict]) -> int:
+    longest = current = 0
+    for day in days:
+        current = current + 1 if day["runs"] == 0 else 0
+        longest = max(longest, current)
+    return longest
+
 
 def export_forward_ledger(reports_dir: Path) -> dict:
     """The live track record: what was predicted before the auction, and how it did.
@@ -321,7 +417,9 @@ def export_health(data_dir: Path, reports_dir: Path | None = None) -> dict:
     }
 
 
-def export_site_data(data_dir: Path, reports_dir: Path, out_dir: Path) -> list[str]:
+def export_site_data(
+    data_dir: Path, reports_dir: Path, out_dir: Path, repo_root: Path | None = None
+) -> list[str]:
     """Write all artifacts; missing upstream reports are skipped, not fatal —
     the dashboard renders what exists and marks the rest as pending."""
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -333,6 +431,7 @@ def export_site_data(data_dir: Path, reports_dir: Path, out_dir: Path) -> list[s
         "agent.json": lambda: export_agent(reports_dir),
         "forward_ledger.json": lambda: export_forward_ledger(reports_dir),
         "health.json": lambda: export_health(data_dir, reports_dir),
+        "uptime.json": lambda: export_uptime(repo_root or Path.cwd(), out_dir / "uptime.json"),
     }
     for filename, builder in exports.items():
         try:

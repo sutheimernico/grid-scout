@@ -1,3 +1,4 @@
+import { Heatmap } from "./charts/Heatmap";
 import { LineChart } from "./charts/LineChart";
 import { StackedArea } from "./charts/StackedArea";
 import type { Loadable } from "./lib/useData";
@@ -11,6 +12,7 @@ import type {
   HealthEntry,
   MarketData,
   ReportEntry,
+  UptimeData,
 } from "./types";
 
 const COLORS = {
@@ -40,6 +42,7 @@ export default function App() {
   const agent = useArtifact<AgentData>("agent.json");
   const health = useArtifact<HealthData>("health.json");
   const ledger = useArtifact<ForwardLedgerData>("forward_ledger.json");
+  const uptime = useArtifact<UptimeData>("uptime.json");
 
   return (
     <>
@@ -344,6 +347,11 @@ export default function App() {
         <div className="kicker">Pipeline</div>
         <h2>Health</h2>
         <p className="sub">
+          Nobody operates this. GitHub Actions is the scheduler, the repo is the database, and the
+          calendar below is the pipeline's own commit history — one cell per day since it went live.
+        </p>
+        <Uptime uptime={uptime} />
+        <p className="sub" style={{ margin: "28px 0 0" }}>
           Every series this site renders, with its freshness. The pipeline opens a GitHub issue on
           itself when something here goes stale.
         </p>
@@ -541,6 +549,34 @@ function LiveForecast({ ledger }: { ledger: Loadable<ForwardLedgerData> }) {
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+function Uptime({ uptime }: { uptime: Loadable<UptimeData> }) {
+  if (uptime.state !== "ready") {
+    return <Pending what="uptime calendar" state={uptime.state} />;
+  }
+  const { days, totals, reference_runs_per_day, scheduled_runs_per_day, first_day } = uptime.data;
+  return (
+    <div className="panel">
+      <p className="panel-title">
+        {totals.days} days live · {totals.runs} published refreshes ·{" "}
+        {totals.days_with_zero_runs === 0
+          ? "no silent day"
+          : `${totals.days_with_zero_runs} silent days (longest streak ${totals.longest_silent_streak_days})`}
+      </p>
+      <p className="panel-sub">
+        Since {first_day}. A cell counts refreshes the pipeline actually published that day; a run
+        that finds no new SMARD data commits nothing, so a pale cell is a quiet market, not an
+        outage. {scheduled_runs_per_day} cron slots per day, median {reference_runs_per_day}{" "}
+        published.
+      </p>
+      <Heatmap
+        days={days}
+        expectedPerDay={reference_runs_per_day}
+        label={`Pipeline runs per day since ${first_day}`}
+      />
     </div>
   );
 }

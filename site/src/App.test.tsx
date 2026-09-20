@@ -8,6 +8,7 @@ import type {
   ForwardLedgerData,
   HealthData,
   MarketData,
+  UptimeData,
 } from "./types";
 
 /* useArtifact is the only IO in the app. vi.hoisted lets the mock factory — which
@@ -191,6 +192,27 @@ const scoredLedger: ForwardLedgerData = {
   latest: { ...pendingLedger.latest!, scored: true, actual: [99, 91, 84] },
 };
 
+const uptime: UptimeData = {
+  generated_at: "2026-09-20T14:52:34+00:00",
+  source: "commit history",
+  scheduled_runs_per_day: 9,
+  reference_runs_per_day: 7,
+  first_day: "2026-09-14",
+  days: [
+    { date: "2026-09-14", runs: 7 },
+    { date: "2026-09-15", runs: 0 },
+    { date: "2026-09-16", runs: 5 },
+  ],
+  totals: {
+    days: 3,
+    runs: 12,
+    days_with_a_run: 2,
+    days_with_zero_runs: 1,
+    longest_silent_streak_days: 1,
+    median_runs_per_active_day: 7,
+  },
+};
+
 const ARTIFACTS = [
   "market.json",
   "forecast.json",
@@ -198,6 +220,7 @@ const ARTIFACTS = [
   "agent.json",
   "health.json",
   "forward_ledger.json",
+  "uptime.json",
 ];
 
 function setAll(state: "loading" | "missing") {
@@ -211,6 +234,7 @@ function setReady() {
   artifacts.set("agent.json", { state: "ready", data: agent });
   artifacts.set("health.json", { state: "ready", data: health });
   artifacts.set("forward_ledger.json", { state: "ready", data: scoredLedger });
+  artifacts.set("uptime.json", { state: "ready", data: uptime });
 }
 
 beforeEach(() => artifacts.clear());
@@ -271,6 +295,27 @@ describe("live forward test", () => {
     expect(screen.getByText(/model beat naive on 3\/4 days/)).toBeTruthy();
     expect(screen.getByText(/cleared prices overlaid/)).toBeTruthy();
     expect(screen.queryByText(/No scored day yet/)).toBeNull();
+  });
+});
+
+describe("uptime calendar", () => {
+  it("leads with the streak and names the silent days instead of hiding them", () => {
+    setReady();
+    const { container } = render(<App />);
+    expect(screen.getByText(/3 days live · 12 published refreshes/)).toBeTruthy();
+    expect(screen.getByText(/1 silent days \(longest streak 1\)/)).toBeTruthy();
+    const cells = container.querySelectorAll("svg rect");
+    expect(cells.length).toBe(3);
+    // the silent day renders as an empty cell, not as a faint green one
+    expect(Array.from(cells).map((c) => c.getAttribute("fill"))).toContain(
+      "var(--grid-hairline)",
+    );
+  });
+
+  it("degrades to a pending panel before the first export", () => {
+    setAll("missing");
+    render(<App />);
+    expect(screen.getByText(/uptime calendar not produced yet/)).toBeTruthy();
   });
 });
 

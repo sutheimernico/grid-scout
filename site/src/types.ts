@@ -153,3 +153,20 @@ export interface ForwardLedgerData {
     actual: number[] | null;
   } | null;
 }
+
+export interface UptimeData {
+  generated_at: string;
+  source: string;
+  scheduled_runs_per_day: number;
+  reference_runs_per_day: number;
+  first_day: string;
+  days: { date: string; runs: number }[];
+  totals: {
+    days: number;
+    runs: number;
+    days_with_a_run: number;
+    days_with_zero_runs: number;
+    longest_silent_streak_days: number;
+    median_runs_per_active_day: number;
+  };
+}

@@ -179,3 +179,43 @@ class TestForwardLedgerExport:
     def test_site_export_skips_the_ledger_until_it_exists(self, data_dir, tmp_path):
         written = export_site_data(data_dir, tmp_path / "no-reports", tmp_path / "out")
         assert "forward_ledger.json" not in written
+
+
+class TestUptime:
+    def test_counts_pipeline_commits_per_day_from_the_real_history(self):
+        """The heartbeat panel is only worth showing if it reads the real repo."""
+        from gridscout.export import export_uptime
+
+        uptime = export_uptime(Path(__file__).resolve().parent.parent)
+        assert uptime["first_day"] == "2026-07-04"  # the day the pipeline went live
+        assert uptime["totals"]["runs"] > 400
+        assert uptime["totals"]["days"] == len(uptime["days"])
+        # dense series: every calendar day present exactly once, gaps included
+        dates = [d["date"] for d in uptime["days"]]
+        assert dates == sorted(dates)
+        assert len(set(dates)) == len(dates)
+
+    def test_merges_the_previous_calendar_so_a_shallow_clone_cannot_lose_history(
+        self, tmp_path
+    ):
+        from gridscout.export import export_uptime
+
+        previous = tmp_path / "uptime.json"
+        previous.write_text(
+            json.dumps(
+                {"days": [{"date": "2020-01-01", "runs": 8}, {"date": "2020-01-03", "runs": 3}]}
+            )
+        )
+        # a directory that is not a git repo stands in for a checkout git cannot read
+        uptime = export_uptime(tmp_path, previous)
+        by_date = {d["date"]: d["runs"] for d in uptime["days"]}
+        assert by_date["2020-01-01"] == 8
+        assert by_date["2020-01-02"] == 0  # the gap is kept, not smoothed away
+        assert by_date["2020-01-03"] == 3
+        assert uptime["totals"]["longest_silent_streak_days"] >= 1
+
+    def test_no_history_at_all_means_no_artifact(self, tmp_path):
+        from gridscout.export import export_uptime
+
+        with pytest.raises(FileNotFoundError):
+            export_uptime(tmp_path, tmp_path / "nothing.json")
