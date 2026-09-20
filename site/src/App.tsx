@@ -8,6 +8,7 @@ import type {
   HealthData,
   HealthEntry,
   MarketData,
+  ReportEntry,
 } from "./types";
 
 const COLORS = {
@@ -343,15 +344,34 @@ export default function App() {
           itself when something here goes stale.
         </p>
         {health.state === "ready" ? (
-          <div className="health-list">
-            {Object.entries(health.data.series).map(([name, s]) => (
-              <div className="health-item" key={name} title={s.note}>
-                <span className="dot" style={{ background: healthColor(s.status) }} />
-                <span>{name}</span>
-                <span className="age">{healthAge(s)}</span>
-              </div>
-            ))}
-          </div>
+          <>
+            <div className="health-list">
+              {Object.entries(health.data.series).map(([name, s]) => (
+                <div className="health-item" key={name} title={s.note}>
+                  <span className="dot" style={{ background: healthColor(s.status) }} />
+                  <span>{name}</span>
+                  <span className="age">{healthAge(s)}</span>
+                </div>
+              ))}
+            </div>
+            {health.data.reports && Object.keys(health.data.reports).length > 0 && (
+              <>
+                <p className="sub" style={{ margin: "20px 0 10px" }}>
+                  Derived reports — the numbers above come from these. Fresh raw data says
+                  nothing about whether the weekly evaluation still runs.
+                </p>
+                <div className="health-list">
+                  {Object.entries(health.data.reports).map(([file, r]) => (
+                    <div className="health-item" key={file}>
+                      <span className="dot" style={{ background: reportColor(r.status) }} />
+                      <span>{r.label}</span>
+                      <span className="age">{reportAge(r)}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </>
         ) : (
           <Pending what="health report" state={health.state} />
         )}
@@ -375,6 +395,20 @@ function healthColor(status: HealthEntry["status"]): string {
   if (status === "stale") return "var(--warning)";
   if (status === "discontinued") return "var(--ink-muted)";
   return "var(--critical)";
+}
+
+/* Report rows: only a report that promised a cadence and missed it turns red.
+   A manual, unknown or never-produced report is muted, not an alarm. */
+function reportColor(status: ReportEntry["status"]): string {
+  if (status === "ok") return "var(--good)";
+  if (status === "aging") return "var(--warning)";
+  if (status === "overdue") return "var(--critical)";
+  return "var(--ink-muted)";
+}
+
+function reportAge(r: ReportEntry): string {
+  if (r.age_days == null) return r.status;
+  return `${r.age_days.toFixed(0)}d`;
 }
 
 function healthAge(s: HealthEntry): string {

@@ -7,6 +7,7 @@ frontend types mirror this module.
 
 import json
 import re
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -166,7 +167,81 @@ def export_agent(reports_dir: Path, examples_per_type: int = 2) -> dict:
     }
 
 
-def export_health(data_dir: Path) -> dict:
+@dataclass(frozen=True)
+class ReportSpec:
+    """Freshness contract for a derived report.
+
+    `cadence_days=None` means nobody promises a schedule (the agent eval needs a
+    local Ollama run), so its row is informational and never alarms.
+    """
+
+    label: str
+    timestamp_key: str
+    cadence_days: int | None = None
+    warn_after_days: int = 8
+    overdue_after_days: int = 15
+
+
+# Written by the weekly full-eval run; the 3-hourly run only refreshes raw data.
+REPORT_SPECS: dict[str, ReportSpec] = {
+    "forecast_eval.json": ReportSpec(
+        "Forecast walk-forward eval", "generated_utc", cadence_days=7
+    ),
+    "battery_backtest.json": ReportSpec("Battery backtest", "generated_utc", cadence_days=7),
+    "agent_eval.json": ReportSpec("Agent eval (local Ollama)", "generated_utc"),
+}
+
+
+def export_report_health(reports_dir: Path) -> dict:
+    """Freshness of the derived reports the dashboard quotes numbers from.
+
+    Without this, a silently dead weekly eval would keep serving months-old
+    forecast metrics under an all-green health panel — the raw series stay
+    fresh, so nothing else would notice.
+    """
+    now = datetime.now(UTC)
+    out = {}
+    for filename, spec in REPORT_SPECS.items():
+        entry: dict = {
+            "label": spec.label,
+            "cadence_days": spec.cadence_days,
+        }
+        path = reports_dir / filename
+        if not path.exists():
+            out[filename] = {**entry, "status": "missing"}
+            continue
+        try:
+            payload = json.loads(path.read_text())
+        except json.JSONDecodeError:
+            out[filename] = {**entry, "status": "unreadable"}
+            continue
+        stamp = payload.get(spec.timestamp_key)
+        if not stamp:
+            # File mtime is the checkout time in CI, so guessing would produce a
+            # false green. An unknown age is reported as unknown.
+            out[filename] = {**entry, "status": "unknown"}
+            continue
+        age_days = (now - datetime.fromisoformat(stamp)).total_seconds() / 86400
+        if spec.cadence_days is None:
+            status = "manual"
+        elif age_days > spec.overdue_after_days:
+            status = "overdue"
+        elif age_days > spec.warn_after_days:
+            status = "aging"
+        else:
+            status = "ok"
+        out[filename] = {
+            **entry,
+            "status": status,
+            "generated_at": stamp,
+            "age_days": round(age_days, 1),
+            "warn_after_days": spec.warn_after_days,
+            "overdue_after_days": spec.overdue_after_days,
+        }
+    return out
+
+
+def export_health(data_dir: Path, reports_dir: Path | None = None) -> dict:
     """Freshness per series — the dashboard's pipeline-health panel."""
     series = {}
     for name, spec in SERIES.items():
@@ -190,7 +265,11 @@ def export_health(data_dir: Path) -> dict:
             entry["status"] = "discontinued"
             entry["note"] = spec.discontinued
         series[name] = entry
-    return {"generated_at": datetime.now(UTC).isoformat(timespec="seconds"), "series": series}
+    return {
+        "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
+        "series": series,
+        "reports": export_report_health(reports_dir) if reports_dir is not None else {},
+    }
 
 
 def export_site_data(data_dir: Path, reports_dir: Path, out_dir: Path) -> list[str]:
@@ -203,7 +282,7 @@ def export_site_data(data_dir: Path, reports_dir: Path, out_dir: Path) -> list[s
         "forecast.json": lambda: export_forecast(reports_dir),
         "battery.json": lambda: export_battery(reports_dir),
         "agent.json": lambda: export_agent(reports_dir),
-        "health.json": lambda: export_health(data_dir),
+        "health.json": lambda: export_health(data_dir, reports_dir),
     }
     for filename, builder in exports.items():
         try:

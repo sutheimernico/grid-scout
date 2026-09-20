@@ -1,6 +1,7 @@
 """gridscout CLI — pipeline entry points, designed to run locally and in CI."""
 
 import logging
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated
 
@@ -100,6 +101,9 @@ def battery_backtest(
         battery,
     )
     out = {
+        # Health monitoring reads this back: an un-stamped report cannot be told
+        # apart from a stale one (git does not preserve mtimes).
+        "generated_utc": datetime.now(UTC).isoformat(timespec="seconds"),
         "battery": {
             "power_mw": power_mw,
             "capacity_mwh": capacity_mwh,

@@ -86,7 +86,28 @@ export interface HealthEntry {
   note?: string;
 }
 
+export type ReportStatus =
+  | "ok"
+  | "aging"
+  | "overdue"
+  | "manual"
+  | "unknown"
+  | "unreadable"
+  | "missing";
+
+export interface ReportEntry {
+  label: string;
+  status: ReportStatus;
+  cadence_days: number | null;
+  generated_at?: string;
+  age_days?: number;
+  warn_after_days?: number;
+  overdue_after_days?: number;
+}
+
 export interface HealthData {
   generated_at: string;
   series: Record<string, HealthEntry>;
+  /** derived reports the dashboard quotes numbers from; {} on older artifacts */
+  reports?: Record<string, ReportEntry>;
 }

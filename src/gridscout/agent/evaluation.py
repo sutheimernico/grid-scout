@@ -16,7 +16,7 @@ import json
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 from gridscout.agent.tools import GridTools, ToolError
@@ -259,6 +259,7 @@ def run_eval(agent, tools: GridTools, reports_dir: Path) -> dict:
         bucket["n"] += 1
         bucket["passed"] += int(r["passed"])
     report = {
+        "generated_utc": datetime.now(UTC).isoformat(timespec="seconds"),
         "model": agent.model,
         "n": len(results),
         "passed": sum(r["passed"] for r in results),

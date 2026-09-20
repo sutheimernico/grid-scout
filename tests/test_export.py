@@ -1,4 +1,5 @@
 import json
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import numpy as np
@@ -82,3 +83,54 @@ def test_export_site_data_skips_missing_reports(data_dir, tmp_path):
     assert "forecast.json" not in written  # no eval report yet
     payload = json.loads((out / "market.json").read_text())
     assert payload["kpis"]["latest_price_eur_mwh"] is not None
+
+
+class TestReportFreshness:
+    """A dead weekly eval must not hide behind fresh raw data."""
+
+    def _write(self, reports_dir, name, payload):
+        reports_dir.mkdir(parents=True, exist_ok=True)
+        (reports_dir / name).write_text(json.dumps(payload))
+
+    def _stamp(self, days_ago):
+        return (datetime.now(UTC) - timedelta(days=days_ago)).isoformat(timespec="seconds")
+
+    def test_weekly_report_ages_then_goes_overdue(self, data_dir, tmp_path):
+        reports = tmp_path / "reports"
+        self._write(reports, "forecast_eval.json", {"generated_utc": self._stamp(10)})
+        self._write(reports, "battery_backtest.json", {"generated_utc": self._stamp(20)})
+        health = export_health(data_dir, reports)
+
+        assert health["reports"]["forecast_eval.json"]["status"] == "aging"
+        assert health["reports"]["forecast_eval.json"]["age_days"] == pytest.approx(10, abs=0.1)
+        assert health["reports"]["battery_backtest.json"]["status"] == "overdue"
+        # raw series are judged independently of the reports
+        assert health["series"]["gen_solar"]["status"] == "stale"
+
+    def test_fresh_report_is_ok_and_manual_report_never_alarms(self, data_dir, tmp_path):
+        reports = tmp_path / "reports"
+        self._write(reports, "forecast_eval.json", {"generated_utc": self._stamp(2)})
+        # the agent eval needs a local Ollama run — it has no cadence to miss
+        self._write(reports, "agent_eval.json", {"generated_utc": self._stamp(400)})
+        health = export_health(data_dir, reports)
+        assert health["reports"]["forecast_eval.json"]["status"] == "ok"
+        assert health["reports"]["agent_eval.json"]["status"] == "manual"
+
+    def test_missing_and_unstamped_reports_are_distinguished(self, data_dir, tmp_path):
+        reports = tmp_path / "reports"
+        self._write(reports, "forecast_eval.json", {"no": "timestamp"})
+        health = export_health(data_dir, reports)
+        # guessing from file mtime would be a false green in CI (git drops mtimes)
+        assert health["reports"]["forecast_eval.json"]["status"] == "unknown"
+        assert health["reports"]["battery_backtest.json"]["status"] == "missing"
+
+    def test_health_without_reports_dir_stays_backwards_compatible(self, data_dir):
+        assert export_health(data_dir)["reports"] == {}
+
+    def test_export_site_data_wires_the_reports_dir_through(self, data_dir, tmp_path):
+        reports = tmp_path / "reports"
+        self._write(reports, "forecast_eval.json", {"generated_utc": self._stamp(1)})
+        out = tmp_path / "out"
+        export_site_data(data_dir, reports, out)
+        payload = json.loads((out / "health.json").read_text())
+        assert payload["reports"]["forecast_eval.json"]["status"] == "ok"
