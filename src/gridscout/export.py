@@ -177,12 +177,19 @@ def export_health(data_dir: Path) -> dict:
         s = _read(data_dir, name).dropna()
         age_hours = (datetime.now(UTC) - s.index.max()).total_seconds() / 3600
         stale_after = 48 if spec.kind in (Kind.PRICE, Kind.FORECAST) else 96
-        series[name] = {
+        entry = {
             "status": "stale" if age_hours > stale_after else "ok",
             "last_value_at": s.index.max().isoformat(),
             "age_hours": round(age_hours, 1),
             "rows": int(len(s)),
         }
+        if spec.discontinued:
+            # A series SMARD no longer publishes can never be fresh again. Reporting
+            # it as stale is a permanent false alarm that trains the reader to
+            # ignore the panel — the one thing an alerting surface must not do.
+            entry["status"] = "discontinued"
+            entry["note"] = spec.discontinued
+        series[name] = entry
     return {"generated_at": datetime.now(UTC).isoformat(timespec="seconds"), "series": series}
 
 

@@ -1,7 +1,14 @@
 import { LineChart } from "./charts/LineChart";
 import { StackedArea } from "./charts/StackedArea";
 import { useArtifact } from "./lib/useData";
-import type { AgentData, BatteryData, ForecastData, HealthData, MarketData } from "./types";
+import type {
+  AgentData,
+  BatteryData,
+  ForecastData,
+  HealthData,
+  HealthEntry,
+  MarketData,
+} from "./types";
 
 const COLORS = {
   model: "var(--s1)",
@@ -338,16 +345,10 @@ export default function App() {
         {health.state === "ready" ? (
           <div className="health-list">
             {Object.entries(health.data.series).map(([name, s]) => (
-              <div className="health-item" key={name}>
-                <span
-                  className="dot"
-                  style={{
-                    background:
-                      s.status === "ok" ? "var(--good)" : s.status === "stale" ? "var(--warning)" : "var(--critical)",
-                  }}
-                />
+              <div className="health-item" key={name} title={s.note}>
+                <span className="dot" style={{ background: healthColor(s.status) }} />
                 <span>{name}</span>
-                <span className="age">{s.status === "missing" ? "missing" : `${s.age_hours}h`}</span>
+                <span className="age">{healthAge(s)}</span>
               </div>
             ))}
           </div>
@@ -365,6 +366,21 @@ export default function App() {
       </footer>
     </>
   );
+}
+
+/* A series SMARD stopped publishing is not a fault — it renders muted, never red,
+   so the only coloured rows in this panel are ones somebody can act on. */
+function healthColor(status: HealthEntry["status"]): string {
+  if (status === "ok") return "var(--good)";
+  if (status === "stale") return "var(--warning)";
+  if (status === "discontinued") return "var(--ink-muted)";
+  return "var(--critical)";
+}
+
+function healthAge(s: HealthEntry): string {
+  if (s.status === "missing") return "missing";
+  if (s.status === "discontinued") return "discontinued";
+  return `${s.age_hours}h`;
 }
 
 function Tile({

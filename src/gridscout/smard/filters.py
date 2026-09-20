@@ -25,6 +25,10 @@ class SeriesSpec:
     kind: Kind
     label: str
     unit: str
+    # Series SMARD stopped publishing. Set to the human-readable reason; freshness
+    # monitoring then reports `discontinued` instead of raising a permanent stale
+    # alarm nobody can act on.
+    discontinued: str | None = None
 
 
 _SPECS = [
@@ -40,7 +44,15 @@ _SPECS = [
     SeriesSpec("forecast_solar", 125, Kind.FORECAST, "Forecast: photovoltaics", "MWh"),
     # Realized generation mix (dashboard)
     SeriesSpec("gen_lignite", 1223, Kind.GENERATION, "Generation: lignite", "MWh"),
-    SeriesSpec("gen_nuclear", 1224, Kind.GENERATION, "Generation: nuclear", "MWh"),
+    SeriesSpec(
+        "gen_nuclear",
+        1224,
+        Kind.GENERATION,
+        "Generation: nuclear",
+        "MWh",
+        discontinued="German nuclear phase-out (last reactors off 2023-04-15); "
+        "SMARD stopped publishing the series in January 2024",
+    ),
     SeriesSpec("gen_wind_offshore", 1225, Kind.GENERATION, "Generation: wind offshore", "MWh"),
     SeriesSpec("gen_hydro", 1226, Kind.GENERATION, "Generation: hydro", "MWh"),
     SeriesSpec("gen_other_conventional", 1227, Kind.GENERATION, "Generation: other conv.", "MWh"),

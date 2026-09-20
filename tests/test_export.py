@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -48,6 +49,30 @@ def test_export_health_flags_missing_and_stale(data_dir):
     # fixture timestamps are historic -> everything present must be stale
     assert health["series"]["price_day_ahead"]["status"] == "stale"
     assert health["series"]["forecast_solar"]["status"] == "missing"
+
+
+def test_discontinued_series_is_not_a_stale_alarm(data_dir):
+    """gen_nuclear can never be fresh again — it must not sit in the panel as a
+    permanent red row next to genuinely broken series."""
+    health = export_health(data_dir)
+    nuclear = health["series"]["gen_nuclear"]
+    assert nuclear["status"] == "discontinued"
+    assert "phase-out" in nuclear["note"]
+    # the same fixture age still alarms for a series that is supposed to update
+    assert health["series"]["gen_solar"]["status"] == "stale"
+
+
+def test_discontinued_status_holds_on_the_real_ingested_data():
+    """Regression guard against the live false alarm: on the repo's actual
+    pipeline data, no discontinued series may report as stale. Independent of
+    how fresh the rest of the data is, so a pipeline outage cannot flip it."""
+    data_dir = Path(__file__).resolve().parent.parent / "data"
+    declared = [name for name, spec in SERIES.items() if spec.discontinued]
+    present = [n for n in declared if (data_dir / f"{n}.parquet").exists()]
+    if not present:
+        pytest.skip("no ingested data for discontinued series in this checkout")
+    health = export_health(data_dir)
+    assert {health["series"][n]["status"] for n in present} == {"discontinued"}
 
 
 def test_export_site_data_skips_missing_reports(data_dir, tmp_path):

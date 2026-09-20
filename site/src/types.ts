@@ -75,10 +75,18 @@ export interface AgentData {
   }[];
 }
 
+export type HealthStatus = "ok" | "stale" | "discontinued" | "missing";
+
+export interface HealthEntry {
+  status: HealthStatus;
+  last_value_at?: string;
+  age_hours?: number;
+  rows?: number;
+  /** why a series is discontinued — shown instead of an unactionable age */
+  note?: string;
+}
+
 export interface HealthData {
   generated_at: string;
-  series: Record<
-    string,
-    { status: "ok" | "stale" | "missing"; last_value_at?: string; age_hours?: number; rows?: number }
-  >;
+  series: Record<string, HealthEntry>;
 }
