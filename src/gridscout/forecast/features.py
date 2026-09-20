@@ -19,6 +19,7 @@ The leakage test in tests/test_features.py enforces this contract by
 perturbation, not by trust.
 """
 
+from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 
@@ -41,6 +42,54 @@ REALIZED_LAG_DAYS = {"load": [2, 7]}
 CALENDAR_FEATURES = ["hour_local", "day_of_week", "month", "is_weekend", "is_holiday"]
 
 
+@dataclass(frozen=True)
+class FeatureSet:
+    """Which inputs a model is allowed to see.
+
+    `day_ahead_series` enter at the target hour itself; `lagged_series` enter
+    shifted by whole days. Two sets exist because availability and honesty are
+    not the same thing — see PRE_AUCTION below.
+    """
+
+    name: str
+    day_ahead_series: tuple[str, ...]
+    price_lag_days: tuple[int, ...]
+    lagged_series: tuple[tuple[str, tuple[int, ...]], ...]
+    target: str = TARGET
+
+    @property
+    def raw_series(self) -> list[str]:
+        names = [self.target, *self.day_ahead_series, *(n for n, _ in self.lagged_series)]
+        return list(dict.fromkeys(names))
+
+
+#: Backtest feature set: uses SMARD's published generation forecast FOR the
+#: target day. Caveat documented in the module docstring — SMARD stores the
+#: latest revision, and it republishes it only in the evening of D-1.
+FULL = FeatureSet(
+    name="full",
+    day_ahead_series=tuple(DAY_AHEAD_SERIES),
+    price_lag_days=tuple(PRICE_LAG_DAYS),
+    lagged_series=tuple((name, tuple(lags)) for name, lags in REALIZED_LAG_DAYS.items()),
+)
+
+#: Live feature set for the forward test: every input is provably on SMARD
+#: before the auction closes, because nothing is dated on the delivery day.
+#: The generation forecasts only enter lagged by whole days.
+PRE_AUCTION = FeatureSet(
+    name="pre_auction",
+    day_ahead_series=(),
+    price_lag_days=(1, 2, 7),
+    lagged_series=(
+        ("load", (2, 7)),
+        ("forecast_solar", (1, 7)),
+        ("forecast_wind_onshore", (1, 7)),
+        ("forecast_wind_offshore", (1,)),
+        ("forecast_generation_total", (1,)),
+    ),
+)
+
+
 def load_series_frame(data_dir: Path, names: list[str]) -> pd.DataFrame:
     """Wide hourly frame, UTC DatetimeIndex, one column per series."""
     columns = {}
@@ -51,23 +100,25 @@ def load_series_frame(data_dir: Path, names: list[str]) -> pd.DataFrame:
     return pd.DataFrame(columns).sort_index()
 
 
-def build_matrix(raw: pd.DataFrame, require_target: bool = True) -> pd.DataFrame:
+def build_matrix(
+    raw: pd.DataFrame, require_target: bool = True, features: FeatureSet = FULL
+) -> pd.DataFrame:
     """Feature matrix + `target` column, indexed by UTC hour.
 
-    raw: wide frame from load_series_frame containing TARGET, DAY_AHEAD_SERIES
-    and the keys of REALIZED_LAG_DAYS. Rows with missing features are dropped
-    (lags eat the first 7 days). With require_target=False, rows whose target
-    is still unknown are kept — that is the inference case: tomorrow's
-    forecasts exist, tomorrow's price does not.
+    raw: wide frame from load_series_frame containing everything in
+    `features.raw_series`. Rows with missing features are dropped (lags eat the
+    first 7 days). With require_target=False, rows whose target is still unknown
+    are kept — that is the inference case: tomorrow's inputs exist, tomorrow's
+    price does not.
     """
     out = pd.DataFrame(index=raw.index)
-    out["target"] = raw[TARGET]
+    out["target"] = raw[features.target]
 
-    for name in DAY_AHEAD_SERIES:
+    for name in features.day_ahead_series:
         out[name] = raw[name]
-    for lag in PRICE_LAG_DAYS:
-        out[f"price_lag_{lag}d"] = raw[TARGET].shift(freq=pd.Timedelta(days=lag))
-    for name, lags in REALIZED_LAG_DAYS.items():
+    for lag in features.price_lag_days:
+        out[f"price_lag_{lag}d"] = raw[features.target].shift(freq=pd.Timedelta(days=lag))
+    for name, lags in features.lagged_series:
         for lag in lags:
             out[f"{name}_lag_{lag}d"] = raw[name].shift(freq=pd.Timedelta(days=lag))
 

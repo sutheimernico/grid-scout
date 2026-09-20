@@ -8,10 +8,18 @@ on:
   schedule:
     - cron: "47 */3 * * *" # ingest + publish, every 3 hours
     - cron: "13 2 * * 1" # full eval, Monday 02:13 UTC
+    # Forward test: 09:23 UTC = 11:23 CET in winter, 11:23 CEST in summer — both
+    # safely before the 12:00 CET day-ahead gate closure, and before SMARD
+    # publishes the cleared prices for the delivery day (~11:55-14:10 UTC).
+    - cron: "23 9 * * *"
   workflow_dispatch:
     inputs:
       full_eval:
         description: "Run full walk-forward eval + battery backtest"
+        type: boolean
+        default: false
+      forward_forecast:
+        description: "Record a pre-auction forecast for tomorrow in the forward ledger"
         type: boolean
         default: false
 
@@ -46,6 +54,10 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.full_eval }}" = "true" ]; then FULL=true; fi
           if [ "${{ github.event.schedule }}" = "13 2 * * 1" ]; then FULL=true; fi
           echo "full=$FULL" >> "$GITHUB_OUTPUT"
+          FORWARD=false
+          if [ "${{ github.event.schedule }}" = "23 9 * * *" ]; then FORWARD=true; fi
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.forward_forecast }}" = "true" ]; then FORWARD=true; fi
+          echo "forward=$FORWARD" >> "$GITHUB_OUTPUT"
 
       - run: uv sync --frozen
 
@@ -57,6 +69,15 @@ jobs:
         run: |
           uv run gridscout forecast-eval
           uv run gridscout battery-backtest
+
+      # Forward test. The command skips itself (exit 0) when SMARD has not
+      # published enough yet — a data fact, not a pipeline failure.
+      - name: Record tomorrow's pre-auction forecast
+        if: steps.mode.outputs.forward == 'true'
+        run: uv run gridscout forecast-tomorrow
+
+      - name: Score forward-ledger entries whose delivery day has cleared
+        run: uv run gridscout score-ledger
 
       - name: Export site artifacts
         run: uv run gridscout export-site

@@ -9,9 +9,7 @@ import numpy as np
 import pandas as pd
 
 from gridscout.forecast.features import (
-    DAY_AHEAD_SERIES,
-    REALIZED_LAG_DAYS,
-    TARGET,
+    FULL,
     build_matrix,
     load_series_frame,
     local_days,
@@ -20,7 +18,7 @@ from gridscout.forecast.metrics import coverage, pinball, summarize
 from gridscout.forecast.models import LightGBMPrice, NaiveYesterday, SeasonalNaiveWeek
 from gridscout.forecast.walkforward import make_folds, run_walkforward
 
-RAW_SERIES = [TARGET, *DAY_AHEAD_SERIES, *REALIZED_LAG_DAYS]
+RAW_SERIES = FULL.raw_series
 
 
 @dataclass

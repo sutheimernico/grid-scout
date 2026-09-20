@@ -139,6 +139,65 @@ def agent_eval(
     )
 
 
+@app.command("forecast-tomorrow")
+def forecast_tomorrow(
+    data_dir: DataDirOpt = Path("data"),
+    reports_dir: Annotated[Path, typer.Option(help="Report directory")] = Path("reports"),
+    target_date: Annotated[
+        str | None, typer.Option(help="Delivery day (YYYY-MM-DD); default tomorrow")
+    ] = None,
+) -> None:
+    """Record one pre-auction forecast for the next delivery day in the forward ledger.
+
+    Skips (exit 0) when SMARD has not published enough yet or when the day's
+    prices are already out — that is a data-availability fact, not a pipeline
+    failure, and it must not drown the real alerts.
+    """
+    from datetime import date as date_type
+
+    from gridscout.forecast.forward import (
+        NotForecastable,
+        append_record,
+        make_prediction,
+        next_delivery_day,
+    )
+
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+    day = date_type.fromisoformat(target_date) if target_date else next_delivery_day()
+    try:
+        record = make_prediction(data_dir, day)
+    except NotForecastable as exc:
+        typer.echo(f"SKIPPED {day}: {exc}")
+        return
+    written = append_record(reports_dir, record)
+    verb = "recorded" if written else "kept existing scored record for"
+    typer.echo(
+        f"{verb} {day}: {len(record['pred_model'])}h, model {record['model_version']}, "
+        f"features {record['feature_set']}, trained on {record['train_rows']} rows"
+    )
+
+
+@app.command("score-ledger")
+def score_ledger_command(
+    data_dir: DataDirOpt = Path("data"),
+    reports_dir: Annotated[Path, typer.Option(help="Report directory")] = Path("reports"),
+) -> None:
+    """Score forward-ledger entries whose delivery day has cleared."""
+    from gridscout.forecast.forward import read_ledger, score_ledger, summarize_ledger
+
+    scored = score_ledger(data_dir, reports_dir)
+    summary = summarize_ledger(read_ledger(reports_dir))
+    for record in scored:
+        typer.echo(
+            f"scored {record['target_date']}: MAE model {record['mae_model']:.2f} vs "
+            f"naive {record['mae_naive']:.2f} vs seasonal-naive {record['mae_snaive7']:.2f}"
+        )
+    typer.echo(
+        f"ledger: {summary['n_scored']} scored, {summary['n_pending']} pending "
+        f"({len(scored)} newly scored)"
+    )
+
+
 @app.command("export-site")
 def export_site(
     data_dir: DataDirOpt = Path("data"),
