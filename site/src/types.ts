@@ -111,3 +111,45 @@ export interface HealthData {
   /** derived reports the dashboard quotes numbers from; {} on older artifacts */
   reports?: Record<string, ReportEntry>;
 }
+
+export interface LedgerWindow {
+  n_days: number;
+  n_hours: number;
+  mae_model: number;
+  mae_naive: number;
+  mae_snaive7: number;
+  skill_vs_naive_pct: number | null;
+  days_model_beat_naive: number;
+}
+
+export interface ForwardLedgerData {
+  generated_at: string;
+  method: string;
+  summary: {
+    n_records: number;
+    n_scored: number;
+    n_pending: number;
+    first_target_date: string | null;
+    last_target_date: string | null;
+    feature_set: string | null;
+    cumulative: LedgerWindow | null;
+    last_7_days: LedgerWindow | null;
+  };
+  days: {
+    target_date: string;
+    generated_at_utc: string;
+    scored: boolean;
+    mae_model: number | null;
+    mae_naive: number | null;
+    mae_snaive7: number | null;
+  }[];
+  latest: {
+    target_date: string;
+    generated_at_utc: string;
+    scored: boolean;
+    hours_local: number[];
+    pred_model: number[];
+    pred_naive: number[];
+    actual: number[] | null;
+  } | null;
+}

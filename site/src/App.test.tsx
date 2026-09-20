@@ -1,7 +1,14 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App, { sumMembers } from "./App";
-import type { AgentData, BatteryData, ForecastData, HealthData, MarketData } from "./types";
+import type {
+  AgentData,
+  BatteryData,
+  ForecastData,
+  ForwardLedgerData,
+  HealthData,
+  MarketData,
+} from "./types";
 
 /* useArtifact is the only IO in the app. vi.hoisted lets the mock factory — which
    vitest hoists above the imports — share the map the tests drive states from. */
@@ -121,9 +128,80 @@ const health: HealthData = {
   },
 };
 
+const pendingLedger: ForwardLedgerData = {
+  generated_at: "2026-09-20T14:45:44+00:00",
+  method: "One forecast per delivery day, recorded before the auction closes.",
+  summary: {
+    n_records: 1,
+    n_scored: 0,
+    n_pending: 1,
+    first_target_date: "2026-09-21",
+    last_target_date: "2026-09-21",
+    feature_set: "pre_auction",
+    cumulative: null,
+    last_7_days: null,
+  },
+  days: [
+    {
+      target_date: "2026-09-21",
+      generated_at_utc: "2026-09-20T09:23:00+00:00",
+      scored: false,
+      mae_model: null,
+      mae_naive: null,
+      mae_snaive7: null,
+    },
+  ],
+  latest: {
+    target_date: "2026-09-21",
+    generated_at_utc: "2026-09-20T09:23:00+00:00",
+    scored: false,
+    hours_local: [0, 1, 2],
+    pred_model: [100, 90, 80],
+    pred_naive: [95, 85, 75],
+    actual: null,
+  },
+};
+
+const scoredLedger: ForwardLedgerData = {
+  ...pendingLedger,
+  summary: {
+    ...pendingLedger.summary,
+    n_records: 5,
+    n_scored: 4,
+    n_pending: 1,
+    cumulative: {
+      n_days: 4,
+      n_hours: 96,
+      mae_model: 12.34,
+      mae_naive: 19.5,
+      mae_snaive7: 24.1,
+      skill_vs_naive_pct: 36.7,
+      days_model_beat_naive: 3,
+    },
+    last_7_days: {
+      n_days: 4,
+      n_hours: 96,
+      mae_model: 12.34,
+      mae_naive: 19.5,
+      mae_snaive7: 24.1,
+      skill_vs_naive_pct: 36.7,
+      days_model_beat_naive: 3,
+    },
+  },
+  latest: { ...pendingLedger.latest!, scored: true, actual: [99, 91, 84] },
+};
+
+const ARTIFACTS = [
+  "market.json",
+  "forecast.json",
+  "battery.json",
+  "agent.json",
+  "health.json",
+  "forward_ledger.json",
+];
+
 function setAll(state: "loading" | "missing") {
-  for (const name of ["market.json", "forecast.json", "battery.json", "agent.json", "health.json"])
-    artifacts.set(name, { state });
+  for (const name of ARTIFACTS) artifacts.set(name, { state });
 }
 
 function setReady() {
@@ -132,6 +210,7 @@ function setReady() {
   artifacts.set("battery.json", { state: "ready", data: battery });
   artifacts.set("agent.json", { state: "ready", data: agent });
   artifacts.set("health.json", { state: "ready", data: health });
+  artifacts.set("forward_ledger.json", { state: "ready", data: scoredLedger });
 }
 
 beforeEach(() => artifacts.clear());
@@ -165,6 +244,33 @@ describe("App states", () => {
     expect(screen.getByText(forecast.eval.finding)).toBeTruthy();
     expect(screen.getByText(/Sample transcripts/)).toBeTruthy();
     expect(screen.queryByText(/not produced yet/)).toBeNull();
+  });
+});
+
+describe("live forward test", () => {
+  it("says there is no ledger instead of showing an empty one", () => {
+    setAll("missing");
+    render(<App />);
+    expect(screen.getByText(/No forward ledger yet/)).toBeTruthy();
+  });
+
+  it("claims nothing while every entry is still pending", () => {
+    setReady();
+    artifacts.set("forward_ledger.json", { state: "ready", data: pendingLedger });
+    render(<App />);
+    expect(screen.getByText(/No scored day yet/)).toBeTruthy();
+    expect(screen.getByText(/outcome still open/)).toBeTruthy();
+    expect(screen.queryByText("MAE model (cumulative)")).toBeNull();
+  });
+
+  it("shows the track record once days are scored", () => {
+    setReady();
+    render(<App />);
+    expect(screen.getByText("MAE model (cumulative)")).toBeTruthy();
+    expect(screen.getByText("12.34")).toBeTruthy();
+    expect(screen.getByText(/model beat naive on 3\/4 days/)).toBeTruthy();
+    expect(screen.getByText(/cleared prices overlaid/)).toBeTruthy();
+    expect(screen.queryByText(/No scored day yet/)).toBeNull();
   });
 });
 

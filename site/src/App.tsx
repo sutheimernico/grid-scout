@@ -1,10 +1,12 @@
 import { LineChart } from "./charts/LineChart";
 import { StackedArea } from "./charts/StackedArea";
+import type { Loadable } from "./lib/useData";
 import { useArtifact } from "./lib/useData";
 import type {
   AgentData,
   BatteryData,
   ForecastData,
+  ForwardLedgerData,
   HealthData,
   HealthEntry,
   MarketData,
@@ -37,6 +39,7 @@ export default function App() {
   const battery = useArtifact<BatteryData>("battery.json");
   const agent = useArtifact<AgentData>("agent.json");
   const health = useArtifact<HealthData>("health.json");
+  const ledger = useArtifact<ForwardLedgerData>("forward_ledger.json");
 
   return (
     <>
@@ -153,10 +156,11 @@ export default function App() {
           only information available at that moment (a perturbation test enforces this). Every
           number below is out-of-sample: expanding walk-forward over a full year, refit weekly.
         </p>
+        <LiveForecast ledger={ledger} />
         {forecast.state === "ready" ? (
           <>
             <div className="panel">
-              <p className="panel-title">Forecast vs. reality — last 4 weeks of the eval period</p>
+              <p className="panel-title">Backtest: forecast vs. reality — last 4 weeks of the eval period</p>
               <p className="panel-sub">
                 point forecast with p10–p90 band · band coverage{" "}
                 {(forecast.data.eval.quantiles.coverage_p10_p90 * 100).toFixed(0)}% (target 80% — the
@@ -415,6 +419,130 @@ function healthAge(s: HealthEntry): string {
   if (s.status === "missing") return "missing";
   if (s.status === "discontinued") return "discontinued";
   return `${s.age_hours}h`;
+}
+
+/* The forward test: predictions written down before the auction, scored later.
+   Three honest states — no ledger yet, entries still pending, entries scored. */
+function LiveForecast({ ledger }: { ledger: Loadable<ForwardLedgerData> }) {
+  if (ledger.state !== "ready") {
+    return (
+      <div className="panel">
+        <p className="panel-title">Live forward test</p>
+        <p className="panel-sub" style={{ margin: 0 }}>
+          {ledger.state === "loading"
+            ? "loading the forward ledger…"
+            : "No forward ledger yet — the daily pre-auction run starts it. Everything below is the backtest."}
+        </p>
+      </div>
+    );
+  }
+  const { summary, latest, method } = ledger.data;
+  const cum = summary.cumulative;
+  const week = summary.last_7_days;
+
+  return (
+    <div className="panel">
+      <p className="panel-title">Live forward test — predictions made before the auction</p>
+      <p className="panel-sub">{method}</p>
+      <div className="tile-row">
+        <Tile
+          label="Forecasts recorded"
+          value={String(summary.n_records)}
+          hint={
+            summary.first_target_date
+              ? `since ${summary.first_target_date} · ${summary.n_pending} awaiting their prices`
+              : "none yet"
+          }
+        />
+        <Tile
+          label="Scored days"
+          value={String(summary.n_scored)}
+          hint={cum ? `${cum.n_hours} delivered hours` : "first scores arrive a day after the first forecast"}
+        />
+        {cum && (
+          <>
+            <Tile label="MAE model (cumulative)" value={cum.mae_model.toFixed(2)} unit="€/MWh" />
+            <Tile
+              label="MAE naive (cumulative)"
+              value={cum.mae_naive.toFixed(2)}
+              unit="€/MWh"
+              hint={`model beat naive on ${cum.days_model_beat_naive}/${cum.n_days} days`}
+            />
+            {week && (
+              <Tile
+                label="Last 7 days"
+                value={`${week.mae_model.toFixed(1)} / ${week.mae_naive.toFixed(1)}`}
+                unit="€/MWh"
+                hint="model / naive"
+              />
+            )}
+          </>
+        )}
+      </div>
+      {cum == null && (
+        <p className="panel-sub" style={{ marginTop: 12 }}>
+          No scored day yet. Nothing here is claimed until the cleared prices arrive — that is the
+          whole point of a forward test.
+        </p>
+      )}
+      {latest && (
+        <>
+          <p className="panel-sub" style={{ marginTop: 16 }}>
+            Delivery day {latest.target_date}, predicted{" "}
+            {new Date(latest.generated_at_utc).toLocaleString("en-GB", {
+              timeZone: "Europe/Berlin",
+            })}
+            {latest.scored ? " · cleared prices overlaid" : " · outcome still open"}
+          </p>
+          <LineChart
+            series={[
+              ...(latest.actual
+                ? [
+                    {
+                      key: "actual",
+                      label: "Cleared price",
+                      color: COLORS.model,
+                      values: latest.actual as (number | null)[],
+                    },
+                  ]
+                : []),
+              {
+                key: "pred",
+                label: "Pre-auction forecast",
+                color: COLORS.baseline,
+                values: latest.pred_model as (number | null)[],
+              },
+              {
+                key: "naive",
+                label: "Naive baseline",
+                color: COLORS.reference,
+                values: latest.pred_naive as (number | null)[],
+                dashed: true,
+              },
+            ]}
+            xLabels={latest.hours_local.map((h) => `${String(h).padStart(2, "0")}:00`)}
+            unit="€/MWh"
+            xTickEvery={3}
+          />
+          <div className="legend">
+            {latest.actual && (
+              <span className="item">
+                <span className="swatch line" style={{ background: COLORS.model }} /> Cleared price
+              </span>
+            )}
+            <span className="item">
+              <span className="swatch line" style={{ background: COLORS.baseline }} /> Pre-auction
+              forecast
+            </span>
+            <span className="item">
+              <span className="swatch line" style={{ background: COLORS.reference }} /> Naive
+              baseline
+            </span>
+          </div>
+        </>
+      )}
+    </div>
+  );
 }
 
 function Tile({

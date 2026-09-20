@@ -241,6 +241,55 @@ def export_report_health(reports_dir: Path) -> dict:
     return out
 
 
+LEDGER_DAYS_ON_SITE = 60
+
+
+def export_forward_ledger(reports_dir: Path) -> dict:
+    """The live track record: what was predicted before the auction, and how it did.
+
+    Raises FileNotFoundError before the first daily run so the dashboard shows
+    its pending state instead of an empty, authoritative-looking panel.
+    """
+    from gridscout.forecast.forward import ledger_path, read_ledger, summarize_ledger
+
+    if not ledger_path(reports_dir).exists():
+        raise FileNotFoundError(ledger_path(reports_dir))
+    records = read_ledger(reports_dir)
+    days = [
+        {
+            "target_date": r["target_date"],
+            "generated_at_utc": r["generated_at_utc"],
+            "scored": bool(r["scored_at_utc"]),
+            "mae_model": r["mae_model"],
+            "mae_naive": r["mae_naive"],
+            "mae_snaive7": r["mae_snaive7"],
+        }
+        for r in sorted(records, key=lambda r: r["target_date"])[-LEDGER_DAYS_ON_SITE:]
+    ]
+    latest = max(records, key=lambda r: r["target_date"], default=None)
+    return {
+        "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
+        "method": (
+            "One forecast per delivery day, recorded before the 12:00 CET day-ahead "
+            "auction closes, on a feature set that contains nothing dated on the "
+            "delivery day. Scored against the cleared prices once they publish."
+        ),
+        "summary": summarize_ledger(records),
+        "days": days,
+        "latest": None
+        if latest is None
+        else {
+            "target_date": latest["target_date"],
+            "generated_at_utc": latest["generated_at_utc"],
+            "scored": bool(latest["scored_at_utc"]),
+            "hours_local": list(latest["hours_local"]),
+            "pred_model": list(latest["pred_model"]),
+            "pred_naive": list(latest["pred_naive"]),
+            "actual": list(latest["actual"]) if latest["actual"] is not None else None,
+        },
+    }
+
+
 def export_health(data_dir: Path, reports_dir: Path | None = None) -> dict:
     """Freshness per series — the dashboard's pipeline-health panel."""
     series = {}
@@ -282,6 +331,7 @@ def export_site_data(data_dir: Path, reports_dir: Path, out_dir: Path) -> list[s
         "forecast.json": lambda: export_forecast(reports_dir),
         "battery.json": lambda: export_battery(reports_dir),
         "agent.json": lambda: export_agent(reports_dir),
+        "forward_ledger.json": lambda: export_forward_ledger(reports_dir),
         "health.json": lambda: export_health(data_dir, reports_dir),
     }
     for filename, builder in exports.items():

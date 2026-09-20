@@ -134,3 +134,48 @@ class TestReportFreshness:
         export_site_data(data_dir, reports, out)
         payload = json.loads((out / "health.json").read_text())
         assert payload["reports"]["forecast_eval.json"]["status"] == "ok"
+
+
+class TestForwardLedgerExport:
+    def _record(self, day, scored):
+        return {
+            "target_date": day,
+            "generated_at_utc": f"{day}T09:23:00+00:00",
+            "information_cutoff_utc": f"{day}T00:00:00+00:00",
+            "feature_set": "pre_auction",
+            "model_version": "abc123",
+            "train_days": 540,
+            "train_rows": 12959,
+            "timestamps_utc": [f"{day}T0{h}:00:00+00:00" for h in range(3)],
+            "hours_local": [0, 1, 2],
+            "pred_model": [100.0, 90.0, 80.0],
+            "pred_naive": [95.0, 85.0, 75.0],
+            "pred_snaive7": [50.0, 50.0, 50.0],
+            "scored_at_utc": f"{day}T23:00:00+00:00" if scored else None,
+            "actual": [99.0, 91.0, 84.0] if scored else None,
+            "mae_model": 2.0 if scored else None,
+            "mae_naive": 5.0 if scored else None,
+            "mae_snaive7": 41.0 if scored else None,
+            "n_hours_scored": 3 if scored else None,
+        }
+
+    def test_export_shapes_the_track_record(self, tmp_path):
+        from gridscout.export import export_forward_ledger
+        from gridscout.forecast.forward import write_ledger
+
+        reports = tmp_path / "reports"
+        write_ledger(
+            reports, [self._record("2026-09-18", True), self._record("2026-09-19", False)]
+        )
+        payload = export_forward_ledger(reports)
+        assert payload["summary"]["n_scored"] == 1
+        assert payload["summary"]["n_pending"] == 1
+        assert payload["summary"]["cumulative"]["mae_model"] == 2.0
+        assert [d["target_date"] for d in payload["days"]] == ["2026-09-18", "2026-09-19"]
+        # the newest record drives the chart, pending or not
+        assert payload["latest"]["target_date"] == "2026-09-19"
+        assert payload["latest"]["actual"] is None
+
+    def test_site_export_skips_the_ledger_until_it_exists(self, data_dir, tmp_path):
+        written = export_site_data(data_dir, tmp_path / "no-reports", tmp_path / "out")
+        assert "forward_ledger.json" not in written
