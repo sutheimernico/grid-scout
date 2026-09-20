@@ -67,7 +67,7 @@ export function Heatmap({ days, expectedPerDay, color = "var(--good)", emptyColo
 
   return (
     <div className="chart-wrap">
-      <svg viewBox={`0 0 ${width} ${height}`} width={width} height={height} role="img" aria-label={label}>
+      <svg className="heatmap" viewBox={`0 0 ${width} ${height}`} width={width} height={height} role="img" aria-label={label}>
         {monthTicks.map((t) => (
           <text key={`${t.name}-${t.col}`} x={LEFT + t.col * (CELL + GAP)} y={10} textAnchor="start">
             {t.name}

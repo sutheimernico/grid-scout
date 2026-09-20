@@ -16,6 +16,7 @@ from pathlib import Path
 import pandas as pd
 
 from gridscout.analysis import captions
+from gridscout.forecast.segments import segment_errors
 from gridscout.smard.filters import SERIES, Kind
 
 TZ = "Europe/Berlin"
@@ -136,6 +137,7 @@ def export_forecast(reports_dir: Path, days: int = 28) -> dict:
     tail = predictions[predictions["local_day"].isin(keep_days)]
     return {
         "eval": eval_report,
+        "segments": segment_errors(predictions),
         "recent": {
             "timestamps": [t.isoformat() for t in tail.index],
             "actual": _values(tail["target"]),

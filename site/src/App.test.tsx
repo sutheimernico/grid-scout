@@ -56,7 +56,24 @@ const market: MarketData = {
 };
 
 const modelMetrics = { mae: 15.25, rmse: 25.1, mae_by_hour: { "0": 12 }, n: 8760 };
+const seg = (segment: string, skill: number | null, best = "model") => ({
+  segment,
+  n: 365,
+  mae_model: 17.6,
+  mae_naive: 28.5,
+  mae_snaive7: 36.1,
+  skill_vs_naive_pct: skill,
+  best,
+});
 const forecast: ForecastData = {
+  segments: {
+    n_hours: 8760,
+    overall: seg("overall", 38.1),
+    by_hour: [seg("00:00", 40.2), seg("20:00", -4.5, "naive")],
+    by_weekday: [seg("Mon", 54.3), seg("Sun", 19.1)],
+    by_regime: [seg("negative prices", 51.4), seg("volatile days", 21.1)],
+    definitions: { "negative prices": "hours that cleared below 0 EUR/MWh" },
+  },
   eval: {
     generated_utc: "2026-09-14T07:56:19+00:00",
     eval_period: { start: "2025-09-13", end: "2026-09-12", n_days: 365, refit_every_days: 7 },
@@ -314,6 +331,30 @@ describe("live forward test", () => {
   });
 });
 
+describe("segment analysis", () => {
+  it("names the slices where the naive baseline still wins", () => {
+    setReady();
+    render(<App />);
+    expect(screen.getByText(/Where the model wins — and where it does not/)).toBeTruthy();
+    expect(screen.getByText(/Naive still wins in: 20:00/)).toBeTruthy();
+    expect(screen.getByText("negative prices")).toBeTruthy();
+  });
+
+  it("does not claim a clean sweep it cannot back", () => {
+    setReady();
+    const clean = {
+      ...forecast,
+      segments: {
+        ...forecast.segments,
+        by_hour: [seg("00:00", 40.2), seg("20:00", 3.1)],
+      },
+    };
+    artifacts.set("forecast.json", { state: "ready", data: clean });
+    render(<App />);
+    expect(screen.getByText(/No slice below zero in this eval period/)).toBeTruthy();
+  });
+});
+
 describe("market caption", () => {
   it("shows the rule-written summary of the last complete day", () => {
     setReady();
@@ -337,7 +378,7 @@ describe("uptime calendar", () => {
     const { container } = render(<App />);
     expect(screen.getByText(/3 days live · 12 published refreshes/)).toBeTruthy();
     expect(screen.getByText(/1 silent days \(longest streak 1\)/)).toBeTruthy();
-    const cells = container.querySelectorAll("svg rect");
+    const cells = container.querySelectorAll("svg.heatmap rect");
     expect(cells.length).toBe(3);
     // the silent day renders as an empty cell, not as a faint green one
     expect(Array.from(cells).map((c) => c.getAttribute("fill"))).toContain(

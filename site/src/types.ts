@@ -36,7 +36,27 @@ export interface MarketData {
   renewable_keys: string[];
 }
 
+export interface Segment {
+  segment: string;
+  n: number;
+  mae_model: number;
+  mae_naive: number;
+  mae_snaive7: number;
+  skill_vs_naive_pct: number | null;
+  best: string;
+}
+
+export interface SegmentAnalysis {
+  n_hours: number;
+  overall: Segment;
+  by_hour: Segment[];
+  by_weekday: Segment[];
+  by_regime: Segment[];
+  definitions: Record<string, string>;
+}
+
 export interface ForecastData {
+  segments: SegmentAnalysis;
   eval: {
     generated_utc: string;
     eval_period: { start: string; end: string; n_days: number; refit_every_days: number };

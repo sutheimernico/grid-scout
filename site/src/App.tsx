@@ -1,5 +1,6 @@
 import { Heatmap } from "./charts/Heatmap";
 import { LineChart } from "./charts/LineChart";
+import { SkillBars } from "./charts/SkillBars";
 import { StackedArea } from "./charts/StackedArea";
 import type { Loadable } from "./lib/useData";
 import { useArtifact } from "./lib/useData";
@@ -12,6 +13,7 @@ import type {
   HealthEntry,
   MarketData,
   ReportEntry,
+  SegmentAnalysis,
   UptimeData,
 } from "./types";
 
@@ -203,6 +205,7 @@ export default function App() {
                 <span className="item"><span className="swatch" style={{ background: "#3987e5", opacity: 0.3 }} /> p10–p90 band</span>
               </div>
             </div>
+            <Segments segments={forecast.data.segments} />
             <div className="panel">
               <p className="panel-title">Against the baselines</p>
               <p className="panel-sub">{forecast.data.eval.finding}</p>
@@ -563,6 +566,56 @@ function LiveForecast({ ledger }: { ledger: Loadable<ForwardLedgerData> }) {
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+/* Aggregate MAE hides the interesting part. Segments where a naive baseline
+   still wins stay in the picture instead of being filtered out. */
+function Segments({ segments }: { segments?: SegmentAnalysis }) {
+  if (!segments) return null;
+  const losing = [...segments.by_hour, ...segments.by_weekday, ...segments.by_regime].filter(
+    (s) => s.best !== "model",
+  );
+  return (
+    <div className="panel">
+      <p className="panel-title">Where the model wins — and where it does not</p>
+      <p className="panel-sub">
+        Skill against the naive baseline per slice of the same {segments.n_hours.toLocaleString("en-GB")}{" "}
+        out-of-sample hours. Above zero the model wins, below zero the baseline does.{" "}
+        {losing.length === 0
+          ? "No slice below zero in this eval period — the weakest are the evening ramp and the most volatile days."
+          : `Naive still wins in: ${losing.map((s) => s.segment).join(", ")}.`}
+      </p>
+      <p className="panel-sub" style={{ marginBottom: 4 }}>By hour of day</p>
+      <SkillBars segments={segments.by_hour} label="Forecast skill by hour of day" labelEvery={2} />
+      <p className="panel-sub" style={{ margin: "14px 0 4px" }}>By weekday</p>
+      <SkillBars segments={segments.by_weekday} label="Forecast skill by weekday" height={140} />
+      <p className="panel-sub" style={{ margin: "14px 0 4px" }}>By price regime</p>
+      <table className="data-table">
+        <thead>
+          <tr>
+            <th>Regime</th>
+            <th>Hours</th>
+            <th>MAE model</th>
+            <th>MAE naive</th>
+            <th>Skill</th>
+          </tr>
+        </thead>
+        <tbody>
+          {segments.by_regime.map((s) => (
+            <tr key={s.segment}>
+              <td title={segments.definitions[s.segment]}>{s.segment}</td>
+              <td>{s.n.toLocaleString("en-GB")}</td>
+              <td>{s.mae_model.toFixed(2)}</td>
+              <td>{s.mae_naive.toFixed(2)}</td>
+              <td style={{ color: (s.skill_vs_naive_pct ?? 0) >= 0 ? "var(--good)" : "var(--critical)" }}>
+                {s.skill_vs_naive_pct == null ? "–" : `${s.skill_vs_naive_pct.toFixed(1)}%`}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
