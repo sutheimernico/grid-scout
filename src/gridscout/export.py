@@ -15,7 +15,10 @@ from pathlib import Path
 
 import pandas as pd
 
+from gridscout.analysis import captions
 from gridscout.smard.filters import SERIES, Kind
+
+TZ = "Europe/Berlin"
 
 
 def _round_long_floats(text: str) -> str:
@@ -77,6 +80,7 @@ def export_market(data_dir: Path, days: int = 14) -> dict:
     )
 
     return {
+        "explanation": _explain_latest_day(price, load, gen_frame),
         "kpis": {
             "latest_price_eur_mwh": _round(price.dropna().iloc[-1]),
             "latest_price_at": price.dropna().index[-1].isoformat(),
@@ -99,6 +103,28 @@ def export_market(data_dir: Path, days: int = 14) -> dict:
         },
         "renewable_keys": sorted(RENEWABLE),
     }
+
+
+def _explain_latest_day(price: pd.Series, load: pd.Series, gen: pd.DataFrame) -> dict | None:
+    """Rule-written caption for the last fully covered local day, or None.
+
+    None rather than a half-day caption: a sentence about "the cheapest hour"
+    built from six hours of data would be wrong in a way nobody could see.
+    """
+    wind_cols = [c for c in ("gen_wind_onshore", "gen_wind_offshore") if c in gen]
+    if "gen_solar" not in gen or not wind_cols:
+        return None
+    frame = captions.align(price, load, gen["gen_solar"], gen[wind_cols].sum(axis=1))
+    if frame.empty:
+        return None
+    days = pd.Series(frame.index.tz_convert(TZ).date, index=frame.index)
+    counts = days.value_counts()
+    # 23 not 24: the March DST day is a full day with 23 hours
+    complete = sorted(day for day, n in counts.items() if n >= 23)
+    if not complete:
+        return None
+    day = complete[-1]
+    return {"day": day.isoformat(), **captions.describe(frame[days == day])}
 
 
 def export_forecast(reports_dir: Path, days: int = 28) -> dict:

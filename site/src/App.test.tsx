@@ -19,6 +19,22 @@ vi.mock("./lib/useData", () => ({
 }));
 
 const market: MarketData = {
+  explanation: {
+    day: "2026-09-19",
+    caption: "Cheapest hour 13:00 at -1.68 EUR/MWh with 26.8 GW of solar.",
+    n_hours: 24,
+    mean_price: 61.2,
+    min_price: -1.68,
+    max_price: 120.78,
+    spread: 122.46,
+    negative_hours: 6,
+    solar_peak_mwh: 26800,
+    wind_mean_mwh: 9000,
+    correlation_price_vs_residual_load: 0.87,
+    cheapest_hours: [{ hour: 13, price: -1.68, residual_load_mwh: -4600 }],
+    priciest_hours: [{ hour: 17, price: 120.78, residual_load_mwh: 17900 }],
+    is_spike: false,
+  },
   kpis: {
     latest_price_eur_mwh: 82.5,
     latest_price_at: "2026-09-20T10:00:00+00:00",
@@ -295,6 +311,23 @@ describe("live forward test", () => {
     expect(screen.getByText(/model beat naive on 3\/4 days/)).toBeTruthy();
     expect(screen.getByText(/cleared prices overlaid/)).toBeTruthy();
     expect(screen.queryByText(/No scored day yet/)).toBeNull();
+  });
+});
+
+describe("market caption", () => {
+  it("shows the rule-written summary of the last complete day", () => {
+    setReady();
+    render(<App />);
+    expect(screen.getByText(/What happened on 2026-09-19/)).toBeTruthy();
+    expect(screen.getByText(/Cheapest hour 13:00/)).toBeTruthy();
+    expect(screen.getByText(/no model, nothing that can invent a driver/)).toBeTruthy();
+  });
+
+  it("says nothing at all when the day is not complete yet", () => {
+    setReady();
+    artifacts.set("market.json", { state: "ready", data: { ...market, explanation: null } });
+    render(<App />);
+    expect(screen.queryByText(/What happened on/)).toBeNull();
   });
 });
 

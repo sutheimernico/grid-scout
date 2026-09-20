@@ -145,6 +145,20 @@ export default function App() {
                 ))}
               </div>
             </div>
+            {market.data.explanation && (
+              <div className="panel">
+                <p className="panel-title">
+                  What happened on {market.data.explanation.day}
+                </p>
+                <p className="panel-sub" style={{ margin: 0 }}>
+                  {market.data.explanation.caption}
+                </p>
+                <p className="panel-sub" style={{ margin: "8px 0 0", fontStyle: "italic" }}>
+                  Assembled by rule from the same numbers the charts show — no model, nothing that
+                  can invent a driver.
+                </p>
+              </div>
+            )}
           </>
         ) : (
           <Pending what="market data" state={market.state} />

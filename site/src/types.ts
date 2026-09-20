@@ -1,6 +1,25 @@
 /* Shapes mirror gridscout/export.py — the pipeline is the source of truth. */
 
+export interface MarketExplanation {
+  day: string;
+  caption: string;
+  n_hours: number;
+  mean_price: number;
+  min_price: number;
+  max_price: number;
+  spread: number;
+  negative_hours: number;
+  solar_peak_mwh: number;
+  wind_mean_mwh: number;
+  correlation_price_vs_residual_load: number | null;
+  cheapest_hours: { hour: number; price: number; residual_load_mwh: number }[];
+  priciest_hours: { hour: number; price: number; residual_load_mwh: number }[];
+  is_spike: boolean;
+}
+
 export interface MarketData {
+  /** rule-written summary of the last fully covered day; null when incomplete */
+  explanation: MarketExplanation | null;
   kpis: {
     latest_price_eur_mwh: number;
     latest_price_at: string;

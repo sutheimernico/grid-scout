@@ -14,6 +14,7 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 
+from gridscout.analysis import captions
 from gridscout.export import GENERATION_ORDER, RENEWABLE
 from gridscout.smard.filters import SERIES
 
@@ -122,47 +123,40 @@ class GridTools:
 
     def explain_price_context(self, day: str) -> dict:
         """Deterministic context for why prices looked the way they did:
-        residual load (demand minus wind+solar) vs price, hour by hour."""
+        residual load (demand minus wind+solar) vs price, hour by hour.
+
+        Shares its arithmetic with the dashboard caption (analysis.captions), so
+        the agent and the site can never tell different stories about a day.
+        """
         prices = self._day_slice("price_day_ahead", day)
         context: dict = {"day": day, "price": {"mean": round(float(prices.mean()), 2)}}
         try:
-            load = self._day_slice("load", day)
-            solar = self._day_slice("gen_solar", day)
             wind = self._day_slice("gen_wind_onshore", day) + self._day_slice(
                 "gen_wind_offshore", day
             )
-            aligned = pd.DataFrame(
-                {"price": prices, "load": load, "solar": solar, "wind": wind}
-            ).dropna()
-            aligned["residual_load"] = aligned["load"] - aligned["solar"] - aligned["wind"]
-            corr_raw = aligned["price"].corr(aligned["residual_load"])
-            # constant series (possible in odd data slices) yield NaN — keep JSON clean
-            corr = None if pd.isna(corr_raw) else float(corr_raw)
-            cheapest = aligned.nsmallest(3, "price")
-            priciest = aligned.nlargest(3, "price")
-            context.update(
-                {
-                    "correlation_price_vs_residual_load": (
-                        None if corr is None else round(corr, 3)
-                    ),
-                    "solar_peak_mwh": round(float(aligned["solar"].max())),
-                    "wind_mean_mwh": round(float(aligned["wind"].mean())),
-                    "cheapest_hours": [
-                        {"hour": int(ts.hour), "price": round(float(r["price"]), 2),
-                         "residual_load_mwh": round(float(r["residual_load"]))}
-                        for ts, r in cheapest.iterrows()
-                    ],
-                    "priciest_hours": [
-                        {"hour": int(ts.hour), "price": round(float(r["price"]), 2),
-                         "residual_load_mwh": round(float(r["residual_load"]))}
-                        for ts, r in priciest.iterrows()
-                    ],
-                    "note": "day-ahead prices track residual load: "
-                    "high wind+solar -> low or negative prices",
-                }
+            aligned = captions.align(
+                prices, self._day_slice("load", day), self._day_slice("gen_solar", day), wind
             )
-        except ToolError:
+            described = captions.describe(aligned)
+        except (ToolError, ValueError):
             context["note"] = "generation context unavailable for this day (price data only)"
+            return context
+        context.update(
+            {
+                key: described[key]
+                for key in (
+                    "correlation_price_vs_residual_load",
+                    "solar_peak_mwh",
+                    "wind_mean_mwh",
+                    "cheapest_hours",
+                    "priciest_hours",
+                )
+            }
+        )
+        context["summary"] = described["caption"]
+        context["note"] = (
+            "day-ahead prices track residual load: high wind+solar -> low or negative prices"
+        )
         return context
 
     def get_forecast_evaluation(self) -> dict:
