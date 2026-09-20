@@ -452,7 +452,7 @@ function Pending({ what, state }: { what: string; state: "loading" | "missing" }
   );
 }
 
-function sumMembers(
+export function sumMembers(
   generation: Record<string, (number | null)[]>,
   members: string[],
 ): (number | null)[] {
