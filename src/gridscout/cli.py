@@ -36,10 +36,20 @@ def ingest(
     if unknown:
         raise typer.BadParameter(f"unknown series: {sorted(unknown)}; known: {sorted(SERIES)}")
     with SmardClient(cache_dir=cache_dir) as client:
-        results = ingest_all(client, data_dir, names=list(series) if series else None)
-    for r in results:
+        run = ingest_all(client, data_dir, names=list(series) if series else None)
+    for r in run.results:
         marker = " ⚠" if r.report.warnings else ""
         typer.echo(f"{r.series}: {r.n_rows} rows ({r.weeks_fetched} weeks fetched){marker}")
+    if run.failures:
+        # Every series was attempted first; exiting non-zero keeps the workflow's
+        # issue alert intact without letting one bad series skip the rest.
+        for name, error in run.failures:
+            typer.echo(f"{name}: FAILED - {error}", err=True)
+        typer.echo(
+            f"{len(run.failures)} of {len(run.results) + len(run.failures)} series failed",
+            err=True,
+        )
+        raise typer.Exit(1)
 
 
 @app.command("forecast-eval")

@@ -2,10 +2,12 @@ from datetime import UTC, datetime
 
 import pandas as pd
 import pytest
+from typer.testing import CliRunner
 
+from gridscout.cli import app
 from gridscout.smard.client import SmardClient
 from gridscout.smard.filters import SERIES
-from gridscout.smard.ingest import ingest_series, series_path
+from gridscout.smard.ingest import ingest_all, ingest_series, series_path
 from tests.conftest import HOUR_MS, WEEK1, WEEK2, WEEK3, make_week
 
 START = datetime(2023, 1, 1, tzinfo=UTC)
@@ -74,3 +76,85 @@ def test_validation_failure_raises(fake_smard, tmp_path):
     fake_smard.set_week(4169, WEEK1, week)
     with pytest.raises(ValueError, match="validation failed"):
         run_ingest(fake_smard, tmp_path)
+
+
+class TestFaultIsolation:
+    """One glitchy SMARD response must not abort the whole 3-hourly run."""
+
+    NAMES = [
+        "price_day_ahead",
+        "load",
+        "gen_solar",
+        "gen_wind_onshore",
+        "gen_biomass",
+    ]
+
+    def _client(self, fake_smard, tmp_path):
+        return SmardClient(
+            cache_dir=tmp_path / "cache", transport=fake_smard.transport, request_delay_s=0
+        )
+
+    def _stub_weeks(self, fake_smard):
+        # WEEK1 starts before the shallow-history cutoff, so stub from WEEK2 on —
+        # otherwise the generation series would legitimately come back empty.
+        for name in self.NAMES:
+            for week in (WEEK2, WEEK3):
+                fake_smard.set_week(SERIES[name].filter_id, week, make_week(week, 10))
+
+    def test_failing_series_does_not_stop_the_rest(self, fake_smard, tmp_path, monkeypatch):
+        self._stub_weeks(fake_smard)
+        broken = self.NAMES[2]
+        real = ingest_series
+
+        def flaky(client, spec, data_dir, start):
+            if spec.name == broken:
+                raise RuntimeError("SMARD returned garbage")
+            return real(client, spec, data_dir, start)
+
+        monkeypatch.setattr("gridscout.smard.ingest.ingest_series", flaky)
+        with self._client(fake_smard, tmp_path) as client:
+            run = ingest_all(client, tmp_path / "data", names=self.NAMES)
+
+        assert not run.ok
+        assert [name for name, _ in run.failures] == [broken]
+        assert "SMARD returned garbage" in run.failures[0][1]
+        # every other series was still attempted and written
+        assert [r.series for r in run.results] == [n for n in self.NAMES if n != broken]
+        for name in self.NAMES:
+            written = series_path(tmp_path / "data", name).exists()
+            assert written is (name != broken)
+
+    def test_all_good_run_reports_no_failures(self, fake_smard, tmp_path):
+        self._stub_weeks(fake_smard)
+        with self._client(fake_smard, tmp_path) as client:
+            run = ingest_all(client, tmp_path / "data", names=self.NAMES)
+        assert run.ok
+        assert len(run.results) == len(self.NAMES)
+
+    def test_cli_exits_non_zero_after_attempting_everything(
+        self, fake_smard, tmp_path, monkeypatch
+    ):
+        self._stub_weeks(fake_smard)
+        monkeypatch.setattr(
+            "gridscout.cli.SmardClient",
+            lambda **kw: SmardClient(
+                cache_dir=tmp_path / "cache", transport=fake_smard.transport, request_delay_s=0
+            ),
+        )
+        real = ingest_series
+
+        def flaky(client, spec, data_dir, start):
+            if spec.name == "gen_solar":
+                raise RuntimeError("boom")
+            return real(client, spec, data_dir, start)
+
+        monkeypatch.setattr("gridscout.smard.ingest.ingest_series", flaky)
+        result = CliRunner().invoke(
+            app,
+            ["ingest", "--data-dir", str(tmp_path / "data")]
+            + [arg for name in self.NAMES for arg in ("-s", name)],
+        )
+        assert result.exit_code == 1
+        assert "gen_solar: FAILED" in result.output
+        assert "1 of 5 series failed" in result.output
+        assert "price_day_ahead:" in result.output  # the healthy ones still ran

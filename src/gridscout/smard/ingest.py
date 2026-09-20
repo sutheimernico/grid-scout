@@ -33,6 +33,18 @@ class IngestResult:
     report: ValidationReport
 
 
+@dataclass
+class IngestRun:
+    """Outcome of one `ingest_all` pass over every requested series."""
+
+    results: list[IngestResult]
+    failures: list[tuple[str, str]]  # (series name, error message)
+
+    @property
+    def ok(self) -> bool:
+        return not self.failures
+
+
 def series_path(data_dir: Path, name: str) -> Path:
     return data_dir / f"{name}.parquet"
 
@@ -95,13 +107,25 @@ def ingest_series(
 
 def ingest_all(
     client: SmardClient, data_dir: Path, names: list[str] | None = None
-) -> list[IngestResult]:
-    results = []
+) -> IngestRun:
+    """Ingest every requested series, isolating failures.
+
+    One glitchy SMARD response must not cost the whole 3-hourly run: each series
+    is attempted, errors are collected, and the caller decides how loudly to
+    fail. `ingest_series` validates before it writes, so a failed series leaves
+    its existing Parquet untouched.
+    """
+    results: list[IngestResult] = []
+    failures: list[tuple[str, str]] = []
     for name in names or list(SERIES):
         spec = SERIES[name]
         start = DEEP_HISTORY_START if name in DEEP_HISTORY_NAMES else SHALLOW_HISTORY_START
-        results.append(ingest_series(client, spec, data_dir, start))
-    return results
+        try:
+            results.append(ingest_series(client, spec, data_dir, start))
+        except Exception as exc:  # noqa: BLE001 - any series may fail independently
+            logger.error("%s: ingest failed: %s", name, exc)
+            failures.append((name, f"{type(exc).__name__}: {exc}"))
+    return IngestRun(results=results, failures=failures)
 
 
 def _week_complete(have_ms: set[int], week_ts: int) -> bool:
