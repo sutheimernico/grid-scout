@@ -228,7 +228,7 @@ const scoredLedger: ForwardLedgerData = {
 const uptime: UptimeData = {
   generated_at: "2026-09-20T14:52:34+00:00",
   source: "commit history",
-  scheduled_runs_per_day: 9,
+  scheduled_runs_per_day: 10,
   reference_runs_per_day: 7,
   first_day: "2026-09-14",
   days: [

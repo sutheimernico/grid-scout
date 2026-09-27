@@ -689,10 +689,10 @@ function Uptime({ uptime }: { uptime: Loadable<UptimeData> }) {
           : `${totals.days_with_zero_runs} silent days (longest streak ${totals.longest_silent_streak_days})`}
       </p>
       <p className="panel-sub">
-        Since {first_day}. A cell counts refreshes the pipeline actually published that day; a run
-        that finds no new SMARD data commits nothing, so a pale cell is a quiet market, not an
-        outage. {scheduled_runs_per_day} cron slots per day, median {reference_runs_per_day}{" "}
-        published.
+        Since {first_day}. A cell counts refreshes the pipeline actually published that day. A run
+        that finds no new SMARD data commits nothing, and GitHub delays or skips some scheduled
+        runs, so a pale cell is not an outage — an empty one would be.{" "}
+        {scheduled_runs_per_day} cron slots per day, median {reference_runs_per_day} published.
       </p>
       <Heatmap
         days={days}

@@ -285,8 +285,8 @@ LEDGER_DAYS_ON_SITE = 60
 # The pipeline's own commit-back message. Counting these per day is the only
 # self-recorded evidence of unattended operation that costs nothing to keep.
 BOT_COMMIT_SUBJECT = "chore(pipeline): refresh data artifacts"
-# Cron slots per day: 8 three-hourly runs + the daily pre-auction forecast run.
-SCHEDULED_RUNS_PER_DAY = 9
+# Cron slots per day: 8 three-hourly runs + 2 pre-auction forecast slots.
+SCHEDULED_RUNS_PER_DAY = 10
 
 
 def _git_run_days(repo_root: Path) -> dict[str, int]:
@@ -342,8 +342,10 @@ def export_uptime(repo_root: Path, previous: Path | None = None) -> dict:
 
     active = sorted(d["runs"] for d in days if d["runs"] > 0)
     # Colour reference is the median ACTIVE day, not the cron slot count: a run
-    # that finds no new SMARD data publishes nothing and leaves no commit, so
-    # scaling against 9 would paint a healthy pipeline as permanently pale.
+    # that finds no new SMARD data publishes nothing and leaves no commit, and
+    # GitHub delays and drops some scheduled runs (measured: 4-6 of 8 three-hourly
+    # slots start per day, median ~1.7 h late). Scaling against the slot count
+    # would paint a healthy pipeline as permanently pale.
     reference = active[len(active) // 2] if active else 1
 
     return {
