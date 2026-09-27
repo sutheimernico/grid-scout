@@ -173,9 +173,9 @@ def forecast_tomorrow(
 ) -> None:
     """Record one pre-auction forecast for the next delivery day in the forward ledger.
 
-    Skips (exit 0) when SMARD has not published enough yet or when the day's
-    prices are already out — that is a data-availability fact, not a pipeline
-    failure, and it must not drown the real alerts.
+    Skips (exit 0) when SMARD has not published enough yet, when the day's
+    auction has already closed, or when its prices are already out — that is a
+    timing fact, not a pipeline failure, and it must not drown the real alerts.
     """
     from datetime import date as date_type
 
