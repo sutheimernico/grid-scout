@@ -336,7 +336,7 @@ describe("segment analysis", () => {
     setReady();
     render(<App />);
     expect(screen.getByText(/Where the model wins — and where it does not/)).toBeTruthy();
-    expect(screen.getByText(/Naive still wins in: 20:00/)).toBeTruthy();
+    expect(screen.getByText(/A baseline still beats the model in: 20:00\./)).toBeTruthy();
     expect(screen.getByText("negative prices")).toBeTruthy();
   });
 
@@ -351,7 +351,10 @@ describe("segment analysis", () => {
     };
     artifacts.set("forecast.json", { state: "ready", data: clean });
     render(<App />);
-    expect(screen.getByText(/No slice below zero in this eval period/)).toBeTruthy();
+    // the weakest slices come from the numbers, not from a hard-coded sentence
+    expect(
+      screen.getByText(/No slice where a baseline beats the model .* weakest are 20:00 \(3\.1%\) and Sun \(19\.1%\)\./),
+    ).toBeTruthy();
   });
 });
 

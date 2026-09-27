@@ -574,9 +574,15 @@ function LiveForecast({ ledger }: { ledger: Loadable<ForwardLedgerData> }) {
    still wins stay in the picture instead of being filtered out. */
 function Segments({ segments }: { segments?: SegmentAnalysis }) {
   if (!segments) return null;
-  const losing = [...segments.by_hour, ...segments.by_weekday, ...segments.by_regime].filter(
-    (s) => s.best !== "model",
-  );
+  const slices = [...segments.by_hour, ...segments.by_weekday, ...segments.by_regime];
+  const losing = slices.filter((s) => s.best !== "model");
+  // Named from the data, never from a sentence written once: the weekly re-eval
+  // moves these numbers, and a stale claim here would be the dishonest kind.
+  const weakest = slices
+    .filter((s) => s.skill_vs_naive_pct != null)
+    .sort((a, b) => a.skill_vs_naive_pct! - b.skill_vs_naive_pct!)
+    .slice(0, 2)
+    .map((s) => `${s.segment} (${s.skill_vs_naive_pct!.toFixed(1)}%)`);
   return (
     <div className="panel">
       <p className="panel-title">Where the model wins — and where it does not</p>
@@ -584,8 +590,10 @@ function Segments({ segments }: { segments?: SegmentAnalysis }) {
         Skill against the naive baseline per slice of the same {segments.n_hours.toLocaleString("en-GB")}{" "}
         out-of-sample hours. Above zero the model wins, below zero the baseline does.{" "}
         {losing.length === 0
-          ? "No slice below zero in this eval period — the weakest are the evening ramp and the most volatile days."
-          : `Naive still wins in: ${losing.map((s) => s.segment).join(", ")}.`}
+          ? `No slice where a baseline beats the model in this eval period${
+              weakest.length ? ` — the weakest are ${weakest.join(" and ")}` : ""
+            }.`
+          : `A baseline still beats the model in: ${losing.map((s) => s.segment).join(", ")}.`}
       </p>
       <p className="panel-sub" style={{ marginBottom: 4 }}>By hour of day</p>
       <SkillBars segments={segments.by_hour} label="Forecast skill by hour of day" labelEvery={2} />
