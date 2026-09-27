@@ -335,3 +335,14 @@ table.data-table th {
   color: var(--ink-muted);
   font-weight: 600;
 }
+/* Five-column tables overflow a 320-375 px phone at desktop padding (measured
+   in headless Chromium; the segment table sat 1 px short of it at 375 px). */
+@media (max-width: 480px) {
+  table.data-table {
+    font-size: 12px;
+  }
+  table.data-table th,
+  table.data-table td {
+    padding: 6px 4px;
+  }
+}

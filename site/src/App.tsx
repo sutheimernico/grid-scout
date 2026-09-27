@@ -649,8 +649,7 @@ function Sensitivity({ sweep }: { sweep?: BatterySensitivity }) {
       <table className="data-table">
         <thead>
           <tr>
-            <th>Round trip</th>
-            <th>Duration</th>
+            <th>Round trip · duration</th>
             <th>Model €/MW/yr</th>
             <th>Capture</th>
             <th>Edge vs naive</th>
@@ -659,8 +658,9 @@ function Sensitivity({ sweep }: { sweep?: BatterySensitivity }) {
         <tbody>
           {sweep.cells.map((c) => (
             <tr key={`${c.round_trip_efficiency}-${c.duration_h}`}>
-              <td>{Math.round(c.round_trip_efficiency * 100)}%</td>
-              <td>{c.duration_h} h</td>
+              <td>
+                {Math.round(c.round_trip_efficiency * 100)}% · {c.duration_h} h
+              </td>
               <td>{fmtEur(c.revenue_eur_per_mw_year.model)}</td>
               <td>{(c.capture_rate_model * 100).toFixed(1)}%</td>
               <td style={{ color: c.model_edge_over_naive_eur_per_mw_year >= 0 ? "var(--good)" : "var(--critical)" }}>
