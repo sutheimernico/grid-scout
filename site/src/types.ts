@@ -79,7 +79,26 @@ export interface ForecastData {
   };
 }
 
+export interface SensitivityCell {
+  round_trip_efficiency: number;
+  duration_h: number;
+  capacity_mwh: number;
+  revenue_eur_per_mw_year: { perfect: number; model: number; naive: number };
+  capture_rate_model: number;
+  capture_rate_naive: number;
+  model_edge_over_naive_eur_per_mw_year: number;
+}
+
+export interface BatterySensitivity {
+  generated_utc: string;
+  power_mw: number;
+  n_days: number;
+  cells: SensitivityCell[];
+}
+
 export interface BatteryData {
+  /** Written by the weekly full eval only; absent until its first run. */
+  sensitivity?: BatterySensitivity;
   summary: {
     battery: { power_mw: number; capacity_mwh: number; round_trip_efficiency: number };
     n_days: number;

@@ -40,6 +40,14 @@ class BacktestResult:
         }
 
 
+def frames_from_predictions(predictions: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Walk-forward predictions -> (actual, model forecast) price frames."""
+    frame = predictions.assign(local_day=pd.to_datetime(predictions["local_day"]).dt.date)
+    actual = frame.rename(columns={"target": "price"})[["local_day", "hour_local", "price"]]
+    model = actual.assign(price=frame["pred_point"].to_numpy())
+    return actual, model
+
+
 def run_backtest(
     actual: pd.DataFrame, forecast: pd.DataFrame, battery: Battery | None = None
 ) -> BacktestResult:

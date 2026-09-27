@@ -82,24 +82,14 @@ def battery_backtest(
 
     import pandas as pd
 
-    from gridscout.battery.backtest import run_backtest
+    from gridscout.battery.backtest import frames_from_predictions, run_backtest
     from gridscout.battery.schedule import Battery
 
-    predictions_path = reports_dir / "predictions.parquet"
-    if not predictions_path.exists():
-        raise typer.BadParameter(f"{predictions_path} missing — run forecast-eval first")
-    predictions = pd.read_parquet(predictions_path)
-    predictions["local_day"] = pd.to_datetime(predictions["local_day"]).dt.date
-
-    actual = predictions.rename(columns={"target": "price"})
+    actual, model = frames_from_predictions(pd.read_parquet(_predictions_path(reports_dir)))
     battery = Battery(
         power_mw=power_mw, capacity_mwh=capacity_mwh, round_trip_efficiency=efficiency
     )
-    result = run_backtest(
-        actual[["local_day", "hour_local", "price"]],
-        actual.assign(price=predictions["pred_point"])[["local_day", "hour_local", "price"]],
-        battery,
-    )
+    result = run_backtest(actual, model, battery)
     out = {
         # Health monitoring reads this back: an un-stamped report cannot be told
         # apart from a stale one (git does not preserve mtimes).
@@ -116,6 +106,40 @@ def battery_backtest(
         reports_dir / "battery_daily.parquet"
     )
     typer.echo(json.dumps(out, indent=2))
+
+
+@app.command("battery-sensitivity")
+def battery_sensitivity(
+    reports_dir: Annotated[Path, typer.Option(help="Report directory")] = Path("reports"),
+) -> None:
+    """Re-run the battery backtest over efficiency x duration (needs forecast-eval first)."""
+    import json
+
+    import pandas as pd
+
+    from gridscout.battery.backtest import frames_from_predictions
+    from gridscout.battery.sensitivity import sweep
+
+    actual, model = frames_from_predictions(pd.read_parquet(_predictions_path(reports_dir)))
+    out = {
+        "generated_utc": datetime.now(UTC).isoformat(timespec="seconds"),
+        **sweep(actual, model),
+    }
+    (reports_dir / "battery_sensitivity.json").write_text(json.dumps(out, indent=2) + "\n")
+    for cell in out["cells"]:
+        typer.echo(
+            f"eta {cell['round_trip_efficiency']:.2f} / {cell['duration_h']}h: "
+            f"model {cell['revenue_eur_per_mw_year']['model']:,.0f} EUR/MW/yr, "
+            f"capture {cell['capture_rate_model']:.1%}, "
+            f"edge over naive {cell['model_edge_over_naive_eur_per_mw_year']:,.0f}"
+        )
+
+
+def _predictions_path(reports_dir: Path) -> Path:
+    path = reports_dir / "predictions.parquet"
+    if not path.exists():
+        raise typer.BadParameter(f"{path} missing — run forecast-eval first")
+    return path
 
 
 @app.command("agent-eval")

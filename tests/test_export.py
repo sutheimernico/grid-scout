@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from gridscout.export import export_health, export_market, export_site_data
+from gridscout.export import export_battery, export_health, export_market, export_site_data
 from gridscout.smard.filters import SERIES
 from tests.conftest import HOUR_MS
 
@@ -85,6 +85,29 @@ def test_export_site_data_skips_missing_reports(data_dir, tmp_path):
     assert payload["kpis"]["latest_price_eur_mwh"] is not None
 
 
+class TestBatteryExport:
+    def _reports(self, tmp_path):
+        reports = tmp_path / "reports"
+        reports.mkdir()
+        (reports / "battery_backtest.json").write_text(json.dumps({"n_days": 2}))
+        pd.DataFrame(
+            {"local_day": ["2025-01-01", "2025-01-02"], "perfect": [10.0, 20.0],
+             "model": [8.0, 18.0], "naive": [7.0, 15.0]}
+        ).to_parquet(reports / "battery_daily.parquet")
+        return reports
+
+    def test_sensitivity_is_absent_until_the_weekly_sweep_has_run(self, tmp_path):
+        payload = export_battery(self._reports(tmp_path))
+        assert "sensitivity" not in payload
+        assert payload["daily"]["cumulative_model"] == [8.0, 26.0]
+
+    def test_sensitivity_is_passed_through_when_present(self, tmp_path):
+        reports = self._reports(tmp_path)
+        sweep = {"generated_utc": "2026-09-28T02:30:00+00:00", "cells": [{"duration_h": 2}]}
+        (reports / "battery_sensitivity.json").write_text(json.dumps(sweep))
+        assert export_battery(reports)["sensitivity"] == sweep
+
+
 class TestReportFreshness:
     """A dead weekly eval must not hide behind fresh raw data."""
 
@@ -123,6 +146,9 @@ class TestReportFreshness:
         # guessing from file mtime would be a false green in CI (git drops mtimes)
         assert health["reports"]["forecast_eval.json"]["status"] == "unknown"
         assert health["reports"]["battery_backtest.json"]["status"] == "missing"
+        # the weekly sensitivity sweep is watched like the other weekly reports
+        assert health["reports"]["battery_sensitivity.json"]["status"] == "missing"
+        assert health["reports"]["battery_sensitivity.json"]["cadence_days"] == 7
 
     def test_health_without_reports_dir_stays_backwards_compatible(self, data_dir):
         assert export_health(data_dir)["reports"] == {}

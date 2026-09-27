@@ -7,6 +7,7 @@ import { useArtifact } from "./lib/useData";
 import type {
   AgentData,
   BatteryData,
+  BatterySensitivity,
   ForecastData,
   ForwardLedgerData,
   HealthData,
@@ -302,6 +303,7 @@ export default function App() {
                 <span className="item"><span className="swatch line" style={{ background: "var(--ink-2)" }} /> Perfect foresight (upper bound)</span>
               </div>
             </div>
+            <Sensitivity sweep={battery.data.sensitivity} />
           </>
         ) : (
           <Pending what="battery backtest" state={battery.state} />
@@ -619,6 +621,51 @@ function Segments({ segments }: { segments?: SegmentAnalysis }) {
               <td>{s.mae_naive.toFixed(2)}</td>
               <td style={{ color: (s.skill_vs_naive_pct ?? 0) >= 0 ? "var(--good)" : "var(--critical)" }}>
                 {s.skill_vs_naive_pct == null ? "–" : `${s.skill_vs_naive_pct.toFixed(1)}%`}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/* One battery is one assumption. The same LP over a small grid shows whether
+   the forecast's value depends on having picked a flattering configuration. */
+function Sensitivity({ sweep }: { sweep?: BatterySensitivity }) {
+  if (!sweep || sweep.cells.length === 0) return null;
+  const edges = sweep.cells.map((c) => c.model_edge_over_naive_eur_per_mw_year);
+  const lo = Math.min(...edges);
+  const hi = Math.max(...edges);
+  return (
+    <div className="panel">
+      <p className="panel-title">Sensitivity: does the edge depend on the battery?</p>
+      <p className="panel-sub">
+        Same {sweep.n_days} days, same LP, only the battery changes ({sweep.power_mw} MW, one cycle
+        per day; the headline battery above is 86% / 2 h). {lo > 0
+          ? `The model beats naive in all ${sweep.cells.length} configurations, by ${fmtEur(lo)}–${fmtEur(hi)} €/MW/yr.`
+          : `The model does not beat naive in every configuration (edge ${fmtEur(lo)} to ${fmtEur(hi)} €/MW/yr).`}
+      </p>
+      <table className="data-table">
+        <thead>
+          <tr>
+            <th>Round trip</th>
+            <th>Duration</th>
+            <th>Model €/MW/yr</th>
+            <th>Capture</th>
+            <th>Edge vs naive</th>
+          </tr>
+        </thead>
+        <tbody>
+          {sweep.cells.map((c) => (
+            <tr key={`${c.round_trip_efficiency}-${c.duration_h}`}>
+              <td>{Math.round(c.round_trip_efficiency * 100)}%</td>
+              <td>{c.duration_h} h</td>
+              <td>{fmtEur(c.revenue_eur_per_mw_year.model)}</td>
+              <td>{(c.capture_rate_model * 100).toFixed(1)}%</td>
+              <td style={{ color: c.model_edge_over_naive_eur_per_mw_year >= 0 ? "var(--good)" : "var(--critical)" }}>
+                {c.model_edge_over_naive_eur_per_mw_year >= 0 ? "+" : ""}
+                {fmtEur(c.model_edge_over_naive_eur_per_mw_year)}
               </td>
             </tr>
           ))}

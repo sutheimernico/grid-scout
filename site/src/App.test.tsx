@@ -358,6 +358,53 @@ describe("segment analysis", () => {
   });
 });
 
+describe("battery sensitivity", () => {
+  const cell = (eff: number, h: number, edge: number) => ({
+    round_trip_efficiency: eff,
+    duration_h: h,
+    capacity_mwh: h,
+    revenue_eur_per_mw_year: { perfect: 90000, model: 85000, naive: 85000 - edge },
+    capture_rate_model: 0.944,
+    capture_rate_naive: 0.9,
+    model_edge_over_naive_eur_per_mw_year: edge,
+  });
+  const sweep = (edges: number[]) => ({
+    generated_utc: "2026-09-28T02:30:00+00:00",
+    power_mw: 1,
+    n_days: 364,
+    cells: [0.85, 0.9, 0.95].flatMap((e, i) => [cell(e, 2, edges[2 * i]), cell(e, 4, edges[2 * i + 1])]),
+  });
+
+  it("stays out of the page until the weekly sweep has run", () => {
+    setReady();
+    render(<App />);
+    expect(screen.queryByText(/does the edge depend on the battery/)).toBeNull();
+  });
+
+  it("renders the six-cell grid and the range of the edge", () => {
+    setReady();
+    artifacts.set("battery.json", {
+      state: "ready",
+      data: { ...battery, sensitivity: sweep([4363, 8584, 4491, 8477, 4513, 8453]) },
+    });
+    const { container } = render(<App />);
+    expect(screen.getByText(/beats naive in all 6 configurations, by 4,363–8,584 €\/MW\/yr/)).toBeTruthy();
+    const panel = screen.getByText(/does the edge depend on the battery/).closest(".panel")!;
+    expect(panel.querySelectorAll("tbody tr").length).toBe(6);
+    expect(container.textContent).toContain("+8,584");
+  });
+
+  it("says so when the model loses to naive somewhere", () => {
+    setReady();
+    artifacts.set("battery.json", {
+      state: "ready",
+      data: { ...battery, sensitivity: sweep([-120, 800, 300, 900, 400, 1000]) },
+    });
+    render(<App />);
+    expect(screen.getByText(/does not beat naive in every configuration \(edge -120 to 1,000/)).toBeTruthy();
+  });
+});
+
 describe("market caption", () => {
   it("shows the rule-written summary of the last complete day", () => {
     setReady();

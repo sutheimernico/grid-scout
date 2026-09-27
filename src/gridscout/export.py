@@ -154,7 +154,7 @@ def export_battery(reports_dir: Path) -> dict:
     daily["cum_perfect"] = daily["perfect"].cumsum()
     daily["cum_model"] = daily["model"].cumsum()
     daily["cum_naive"] = daily["naive"].cumsum()
-    return {
+    out = {
         "summary": summary,
         "daily": {
             "days": daily["local_day"].astype(str).tolist(),
@@ -163,6 +163,12 @@ def export_battery(reports_dir: Path) -> dict:
             "cumulative_naive": _values(daily["cum_naive"]),
         },
     }
+    # Optional: the sweep is written by the weekly full eval only, so the battery
+    # section must not disappear in the window before its first run.
+    sensitivity = reports_dir / "battery_sensitivity.json"
+    if sensitivity.exists():
+        out["sensitivity"] = json.loads(sensitivity.read_text())
+    return out
 
 
 def export_agent(reports_dir: Path, examples_per_type: int = 2) -> dict:
@@ -218,6 +224,9 @@ REPORT_SPECS: dict[str, ReportSpec] = {
         "Forecast walk-forward eval", "generated_utc", cadence_days=7
     ),
     "battery_backtest.json": ReportSpec("Battery backtest", "generated_utc", cadence_days=7),
+    "battery_sensitivity.json": ReportSpec(
+        "Battery sensitivity sweep", "generated_utc", cadence_days=7
+    ),
     "agent_eval.json": ReportSpec("Agent eval (local Ollama)", "generated_utc"),
 }
 
