@@ -1,6 +1,6 @@
 # Plan: Live Proof + Analytical Depth — grid-scout
 
-**Date:** 2026-07-20 · **Status:** awaiting go · **Executor:** any capable agent (self-contained — no session context required)
+**Date:** 2026-07-20 · **Status:** executed 2026-09-20/27 on `chore/save-plans`, not merged — see Outcome · **Executor:** any capable agent (self-contained — no session context required)
 
 ## Context (verified 2026-07-20 by code review + live checks)
 
@@ -121,3 +121,134 @@ Tooltips with exact values (SVG hover, no library) + a 7d/30d/90d range switcher
 - Go for this plan; PR review + merge to `main` (public flagship — workflow changes activate only after merge; the forward ledger starts growing from merge day, its value compounds weekly).
 - Portfolio link to grid-scout (still open from 2026-07-04).
 - Decision whether the ENTSO-E extension is ever wanted (registration = his email).
+
+---
+
+## Outcome (2026-09-27)
+
+Executed on branch `chore/save-plans` (not `feat/live-proof`: the plan-save commit
+and all work share one branch). Tasks 1–10 on 2026-09-20; that run hit a usage
+limit after Task 10. Finished 2026-09-27: Task 11, fixes to Tasks 6, 8 and 10,
+and a frontend performance pass. Rebased onto `origin/main` (clean — the branch
+never touches `data/`, `reports/` or `site/public/data/`). Nothing pushed.
+
+### Task map
+
+| Task | State | Commit(s) |
+|---|---|---|
+| 1 Per-series fault isolation | done | `fix(ingest): isolate per-series failures …` |
+| 2 Discontinued series (`gen_nuclear`) | done — verified on real data: `discontinued`, not `stale` | `fix(health): report discontinued series …` |
+| 3 Derived-report freshness | done | `feat(health): monitor freshness of the derived reports …` |
+| 4 Deploy retry | done (no `actionlint` on the machine — reviewed by hand) | `ci: retry the Pages deploy once …` |
+| 5 App component tests | done | `test(site): pin App's core states …` |
+| 6 Forward forecast + ledger | done, **fixed 2026-09-27** (see deviations) | `feat(forecast): daily pre-auction forecast …`, `fix(forecast): refuse forward records once the auction has closed` |
+| 7 Live-forecast panel | done | `feat(site): live forward-test panel …` |
+| 8 Uptime heatmap | done, caption corrected | `feat(site): uptime calendar …`, `fix(site): uptime caption no longer blames …` |
+| 9 Deterministic captions | done | `feat(analysis): deterministic market caption …` |
+| 10 Segmented error analysis | done, caption corrected | `feat(forecast): segmented error analysis …`, `fix(site): name the weakest forecast slices …` |
+| 11 Battery sensitivity sweep | **done 2026-09-27** | `feat(battery): efficiency x duration sensitivity sweep …` |
+| 12 Chart interactivity (stretch) | **open** — see below | — |
+| Frontend performance | done 2026-09-27 | `fix(site): keep the data tables inside a phone-width panel`, `perf(site): render the page body in one pass …` |
+
+### Deviations and findings
+
+- **Task 6, live feature set.** The forward model runs on a reduced
+  `PRE_AUCTION` feature set: SMARD republishes the generation forecast *for*
+  day D only in the evening of D-1, after the auction (measured from the bot's
+  commit history), so the backtest's `FULL` set is not available live. The live
+  model is expected to be weaker than the backtest; that gap is the number the
+  ledger will show.
+- **Task 6, timing (fixed 2026-09-27).** GitHub starts this repo's scheduled
+  runs a median 1.7 h and up to ~3 h late and runs only 4–6 of the 8
+  three-hourly slots per day (gh run history, 2026-09-06..27). The original
+  `23 9 * * *` slot would therefore usually have landed after the 10:00 UTC
+  summer gate, and `make_prediction` only refused once prices were *published*
+  (~2 h after the gate) — a local dry run at 11:51 UTC recorded a
+  "pre-auction" forecast after the auction. Now: a clock guard (before and
+  after training) against 12:00 German time on D-1, and the cron moved to
+  `23 4,6 * * *` (all pre-auction inputs are on SMARD by then; verified on the
+  05:51 UTC data snapshot). The workflow comment also had the winter offset
+  wrong.
+- **Task 7–10 UI language:** English, matching the rest of the site, instead of
+  the German caption examples in this plan.
+- **Task 8:** counts the pipeline's commit-back commits (published refreshes,
+  not attempted runs), merged with the previously published calendar so a
+  shallow clone cannot lose history. The caption claimed pale cells meant a
+  quiet market; given the run throttling above it now names both causes.
+- **Task 10:** the "no slice below zero" branch hard-coded "the weakest are the
+  evening ramp and the most volatile days"; on the current eval the weakest
+  are Sunday (16.6%) and 22:00 (21.9%). Now computed from the data.
+- **Task 11:** grid exactly as specified (85/90/95% × 2 h/4 h, 1 MW, one cycle
+  per day, so 4 h moves twice the energy); the headline 86% battery is not a
+  grid cell. On the 2026-09-21 predictions the model beats naive in all six
+  cells, +4,363 to +8,584 €/MW/yr, capture 94.0–96.2%. The table stays off the
+  page until the first weekly run writes `reports/battery_sensitivity.json`.
+- **Task 12 left open (stretch):** mouse crosshair + tooltips already existed
+  in `LineChart`; missing are keyboard access and the 7d/30d/90d switcher. The
+  switcher needs 90 days of hourly market data (`market.json` 15 → 95 kB
+  gzipped) or a daily aggregation for the long ranges — a design/payload
+  trade-off for Nico, not a mechanical task.
+- **Commit-subject blemish:** `feat(forecast): segmented error analysis, skill
+  bars and the deterministic captions` — the captions landed in the commit
+  before it. Left as is (no history rewrite for a subject line).
+- **Test flake, not reproduced:** one `tests/test_forward.py` run hung for
+  >11 min while two local Ollama servers used ~10 cores; the re-run took 10 s
+  and every later full run passed. Suspected LightGBM/OpenMP oversubscription
+  under contention; CI runners are not contended like that.
+
+### Actions-minutes impact
+
+Weekly full eval: +~30 s for the sensitivity sweep (6 × 3 LPs per day over the
+year, 28 s measured locally). Daily: two extra scheduled runs (04:23, 06:23 UTC)
+at the normal run cost (~1–5 min each, from run history). Public repo, so all
+of it stays free.
+
+### Verification (2026-09-27)
+
+- Gates: `uv run pytest` 135 passed, `uv run ruff check .` clean,
+  `npm test` 38 passed, `npm run build` green (JS 223.8 kB / 70.2 kB gzip,
+  CSS 4.9 / 1.6 kB).
+- Dry runs against the real pulled data (outputs to a scratch directory, nothing
+  written to `reports/`): `forecast-tomorrow` (recorded before the fix, SKIPPED
+  with "auction … closed" after it), `battery-backtest` (report unchanged after
+  the refactor), `battery-sensitivity`, `export-site` (uptime: 86 days, 532
+  published refreshes, 0 silent days; `gen_nuclear` → `discontinued`).
+  `score-ledger` is covered by fixture tests (pending → scored, partial day
+  stays pending, scored records never overwritten).
+- Site pass: headless Chromium against `vite preview` with the real exported
+  JSON, desktop 1350 px and phone 412/375/320 px; empty and loading states are
+  pinned in vitest.
+- Performance (built site, real data; phone profile = 4× CPU, 1.6 Mbit/s,
+  150 ms RTT; machine was under heavy unrelated CPU load, so blocking-time
+  numbers are noisy):
+
+  | | live site today | branch before | branch after |
+  |---|---|---|---|
+  | CLS desktop / phone | 0.27 / 0.49 | 0.55 / 0.49 | **0 / 0.003** |
+  | TBT phone | 265 ms | 617 ms | 416 ms |
+  | FCP phone | 788 ms | 756 ms | 760 ms |
+  | transfer | 104 kB | 111 kB | 111 kB |
+  | horizontal scroll at 375 px | no | yes (+46 px) | **no** (also none at 320 px) |
+
+  The remaining blocking time is the single full render of ~880 DOM nodes
+  (the live page has ~410); not optimized further without a clean measurement.
+
+### What to look at in review (screens)
+
+Live forward-test panel (pending state), "Where the model wins" segments panel,
+battery sensitivity table, uptime calendar, health panel with the grey
+`gen_nuclear` row — at desktop width and at 375 px. (Checked headless during
+the pass; no screenshot files are committed.)
+
+### Open / Needs Nico
+
+- Review + push/merge to `main` (workflow changes and the forward ledger only
+  start after merge; the ledger's value compounds from merge day).
+- Right after merge: one manual full eval (`gh workflow run pipeline.yml -f
+  full_eval=true`) so the sensitivity table and the battery report's new
+  timestamp exist before next Monday; until then the health panel shows the
+  battery backtest as "unknown" (the old report has no timestamp) and the
+  sensitivity row as "missing" — both muted, not red. The agent eval stays
+  "unknown" until the next local `uv run gridscout agent-eval` (needs Ollama).
+- Task 12 design decision (payload vs. aggregation).
+- Quantile calibration stays deferred (PLAN.md).

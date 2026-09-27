@@ -44,6 +44,12 @@ Built and verified locally before publish:
 Deviations from plan: none structural. Deferred as optional polish: quantile
 calibration (conformal), live "tomorrow" forecast on the site.
 
+Update 2026-09-27 (`docs/superpowers/plans/2026-07-20-live-proof-and-depth.md`,
+branch `chore/save-plans`, not merged yet): the live "tomorrow" forecast is
+built as a scored forward ledger, and the Phase-3 sensitivity (efficiency,
+2 h vs 4 h) is delivered as a weekly sweep. Still deferred: quantile
+calibration. Details in that plan's Outcome section.
+
 ## Phase 1 — SMARD ingestion
 
 Goal: `gridscout ingest` fetches hourly series from SMARD into partitioned
