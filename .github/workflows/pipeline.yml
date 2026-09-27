@@ -8,10 +8,13 @@ on:
   schedule:
     - cron: "47 */3 * * *" # ingest + publish, every 3 hours
     - cron: "13 2 * * 1" # full eval, Monday 02:13 UTC
-    # Forward test: 09:23 UTC = 11:23 CET in winter, 11:23 CEST in summer — both
-    # safely before the 12:00 CET day-ahead gate closure, and before SMARD
-    # publishes the cleared prices for the delivery day (~11:55-14:10 UTC).
-    - cron: "23 9 * * *"
+    # Forward test, twice each morning (04:23 and 06:23 UTC). Gate closure is 12:00
+    # German time = 10:00 UTC in summer. GitHub starts this repo's scheduled runs
+    # up to ~3 h late and skips some (measured on the 3-hourly slots), so a single
+    # late-morning slot would often land after the auction. The command checks the
+    # clock itself and skips once the gate has passed. The second slot is a backup:
+    # if both run, the later pre-gate record replaces the still-pending one.
+    - cron: "23 4,6 * * *"
   workflow_dispatch:
     inputs:
       full_eval:
@@ -61,7 +64,7 @@ jobs:
           if [ "${{ github.event.schedule }}" = "13 2 * * 1" ]; then FULL=true; fi
           echo "full=$FULL" >> "$GITHUB_OUTPUT"
           FORWARD=false
-          if [ "${{ github.event.schedule }}" = "23 9 * * *" ]; then FORWARD=true; fi
+          if [ "${{ github.event.schedule }}" = "23 4,6 * * *" ]; then FORWARD=true; fi
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.forward_forecast }}" = "true" ]; then FORWARD=true; fi
           echo "forward=$FORWARD" >> "$GITHUB_OUTPUT"
 

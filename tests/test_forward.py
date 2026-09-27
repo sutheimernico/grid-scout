@@ -6,6 +6,7 @@ import pytest
 from typer.testing import CliRunner
 
 from gridscout.cli import app
+from gridscout.forecast import forward
 from gridscout.forecast.features import FULL, PRE_AUCTION, load_series_frame
 from gridscout.forecast.forward import (
     ForwardConfig,
@@ -15,6 +16,7 @@ from gridscout.forecast.forward import (
     day_index_utc,
     day_start_utc,
     extend_to_delivery_day,
+    gate_closure_utc,
     make_prediction,
     next_delivery_day,
     read_ledger,
@@ -77,6 +79,19 @@ def data(tmp_path):
     return build_data(tmp_path)
 
 
+#: The morning of the day before TARGET_DAY — the moment the daily job runs.
+MORNING_BEFORE = datetime.combine(TARGET_DAY - timedelta(days=1), datetime.min.time(), UTC).replace(
+    hour=6
+)
+
+
+@pytest.fixture(autouse=True)
+def pinned_clock(monkeypatch):
+    """TARGET_DAY lies in the past, so the real clock would always be past its
+    auction. Pin it to the morning before; tests that need another time re-pin."""
+    monkeypatch.setattr(forward, "utc_now", lambda: MORNING_BEFORE)
+
+
 class TestCalendar:
     def test_next_delivery_day_is_tomorrow_in_german_market_time(self):
         # 23:30 UTC in summer is already the next day in Berlin
@@ -133,6 +148,40 @@ class TestPrediction:
         assert record["information_cutoff_utc"].startswith(
             str(TARGET_DAY - timedelta(days=1))
         ) or record["information_cutoff_utc"].startswith(str(TARGET_DAY))
+
+    def test_record_carries_the_time_it_was_made(self, data):
+        data_dir, _, _ = data
+        record = make_prediction(data_dir, TARGET_DAY, FAST)
+        assert record["generated_at_utc"] == MORNING_BEFORE.isoformat(timespec="seconds")
+
+    def test_refuses_once_the_auction_has_closed(self, data, monkeypatch):
+        # prices are not public yet, so only the clock can tell this is too late
+        data_dir, _, _ = data
+        gate = gate_closure_utc(TARGET_DAY).to_pydatetime()
+        monkeypatch.setattr(forward, "utc_now", lambda: gate)
+        with pytest.raises(NotForecastable, match="auction .* closed"):
+            make_prediction(data_dir, TARGET_DAY, FAST)
+        monkeypatch.setattr(forward, "utc_now", lambda: gate - timedelta(minutes=1))
+        assert make_prediction(data_dir, TARGET_DAY, FAST)["target_date"] == str(TARGET_DAY)
+
+    def test_refuses_when_the_gate_passes_while_the_model_trains(self, data, monkeypatch):
+        data_dir, _, _ = data
+        gate = gate_closure_utc(TARGET_DAY).to_pydatetime()
+        clock = iter([gate - timedelta(seconds=5), gate + timedelta(seconds=30)])
+        monkeypatch.setattr(forward, "utc_now", lambda: next(clock))
+        with pytest.raises(NotForecastable, match="closed"):
+            make_prediction(data_dir, TARGET_DAY, FAST)
+
+    @pytest.mark.parametrize(
+        ("day", "expected_utc"),
+        [
+            (date(2026, 7, 2), "2026-07-01T10:00:00+00:00"),  # CEST, UTC+2
+            (date(2026, 12, 2), "2026-12-01T11:00:00+00:00"),  # CET, UTC+1
+            (date(2026, 10, 26), "2026-10-25T11:00:00+00:00"),  # D-1 is the switch day
+        ],
+    )
+    def test_gate_closure_is_noon_german_time_on_the_day_before(self, day, expected_utc):
+        assert gate_closure_utc(day).isoformat() == expected_utc
 
     def test_refuses_once_the_prices_are_public(self, tmp_path):
         data_dir, _, _ = build_data(tmp_path, prices_include_target=True)
@@ -264,6 +313,23 @@ class TestCli:
         )
         assert result.exit_code == 0
         assert "SKIPPED" in result.output
+        assert not (tmp_path / "reports").exists()
+
+    def test_a_late_run_skips_instead_of_recording(self, data, tmp_path, monkeypatch):
+        data_dir, _, _ = data
+        late = gate_closure_utc(TARGET_DAY).to_pydatetime() + timedelta(minutes=40)
+        monkeypatch.setattr(forward, "utc_now", lambda: late)
+        result = CliRunner().invoke(
+            app,
+            [
+                "forecast-tomorrow",
+                "--data-dir", str(data_dir),
+                "--reports-dir", str(tmp_path / "reports"),
+                "--target-date", str(TARGET_DAY),
+            ],
+        )
+        assert result.exit_code == 0
+        assert "SKIPPED" in result.output and "closed" in result.output
         assert not (tmp_path / "reports").exists()
 
     def test_records_and_then_scores_through_the_cli(self, data, tmp_path):

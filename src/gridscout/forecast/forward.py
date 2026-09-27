@@ -31,7 +31,7 @@ import hashlib
 import json
 import logging
 from dataclasses import dataclass
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -103,6 +103,36 @@ def next_delivery_day(now: datetime | None = None) -> date:
     return (now.astimezone(BERLIN) + timedelta(days=1)).date()
 
 
+def utc_now() -> datetime:
+    """The clock the gate check reads — a function so tests can pin it."""
+    return datetime.now(UTC)
+
+
+def gate_closure_utc(target_day: date) -> pd.Timestamp:
+    """Day-ahead gate closure for `target_day`: 12:00 German time on the day before."""
+    return pd.Timestamp(
+        datetime.combine(target_day - timedelta(days=1), time(12)), tz=TZ
+    ).tz_convert("UTC")
+
+
+def assert_before_gate_closure(target_day: date) -> datetime:
+    """Return the current time, or refuse once the day's auction has closed.
+
+    Checked against the clock, not the data: GitHub starts this repo's scheduled
+    runs up to ~3 h late (median ~1.7 h), so a job planned for the morning can
+    land after the auction — and the cleared prices only appear on SMARD some
+    time later, so the data alone cannot tell.
+    """
+    now = utc_now()
+    gate = gate_closure_utc(target_day)
+    if now >= gate:
+        raise NotForecastable(
+            f"the day-ahead auction for {target_day} closed at {gate.isoformat()} — "
+            "a record made now would not be a pre-auction forecast"
+        )
+    return now
+
+
 def day_start_utc(day: date) -> pd.Timestamp:
     """00:00 Europe/Berlin of `day`, as a UTC timestamp."""
     return pd.Timestamp(day, tz=TZ).tz_convert("UTC")
@@ -162,11 +192,13 @@ def model_version(config: ForwardConfig, columns: list[str]) -> str:
 def make_prediction(data_dir: Path, target_day: date, config: ForwardConfig | None = None) -> dict:
     """Train on everything published before `target_day` and predict its prices.
 
-    Raises NotForecastable when the delivery day's prices are already known (then
-    it would be hindsight, not a forecast) or when its features are incomplete.
+    Raises NotForecastable when the auction for the day has already closed or its
+    prices are already known (then it would be hindsight, not a forecast), or when
+    its features are incomplete.
     """
     config = config or ForwardConfig()
     features = config.features
+    assert_before_gate_closure(target_day)
     raw = extend_to_delivery_day(load_series_frame(data_dir, features.raw_series), target_day)
     cutoff = day_start_utc(target_day)
 
@@ -201,10 +233,12 @@ def make_prediction(data_dir: Path, target_day: date, config: ForwardConfig | No
     model = LightGBMPrice(n_estimators=config.n_estimators, seed=config.seed)
     model.fit(train[cols], train["target"])
     predictions = np.asarray(model.predict(day_rows[cols]))
+    # Stamped when the numbers exist, and checked again: training takes a while.
+    generated_at = assert_before_gate_closure(target_day)
 
     return {
         "target_date": target_day.isoformat(),
-        "generated_at_utc": datetime.now(UTC).isoformat(timespec="seconds"),
+        "generated_at_utc": generated_at.isoformat(timespec="seconds"),
         "information_cutoff_utc": cutoff.isoformat(),
         "feature_set": features.name,
         "model_version": model_version(config, cols),
