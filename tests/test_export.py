@@ -1,4 +1,5 @@
 import json
+import subprocess
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -212,7 +213,16 @@ class TestUptime:
         """The heartbeat panel is only worth showing if it reads the real repo."""
         from gridscout.export import export_uptime
 
-        uptime = export_uptime(Path(__file__).resolve().parent.parent)
+        repo = Path(__file__).resolve().parent.parent
+        shallow = subprocess.run(
+            ["git", "rev-parse", "--is-shallow-repository"],
+            cwd=repo, capture_output=True, text=True, check=False,
+        ).stdout.strip()
+        if shallow != "false":
+            # CI's default checkout has one commit; the pipeline itself fetches the
+            # full history, and the merge test below covers the shallow case.
+            pytest.skip("needs the full git history (shallow or no git checkout)")
+        uptime = export_uptime(repo)
         assert uptime["first_day"] == "2026-07-04"  # the day the pipeline went live
         assert uptime["totals"]["runs"] > 400
         assert uptime["totals"]["days"] == len(uptime["days"])
