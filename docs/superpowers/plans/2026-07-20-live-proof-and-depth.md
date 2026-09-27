@@ -188,6 +188,14 @@ never touches `data/`, `reports/` or `site/public/data/`). Nothing pushed.
   switcher needs 90 days of hourly market data (`market.json` 15 → 95 kB
   gzipped) or a daily aggregation for the long ranges — a design/payload
   trade-off for Nico, not a mechanical task.
+- **CI would have gone red on first push (fixed 2026-09-27):** `ci.yml` uses
+  the default one-commit checkout, where the real-history uptime test finds no
+  pipeline commits and errors. Reproduced in a `--depth 1` clone; the test now
+  skips in shallow clones (`fix(test): skip the full-history uptime check …`).
+  Related watch item: the pipeline job now checks out with `fetch-depth: 0`
+  (~100 MB pack today, growing with every data commit); `filter: blob:none`
+  would make that cheap if it ever gets slow — not changed, not measured as a
+  problem yet.
 - **Commit-subject blemish:** `feat(forecast): segmented error analysis, skill
   bars and the deterministic captions` — the captions landed in the commit
   before it. Left as is (no history rewrite for a subject line).
@@ -205,7 +213,7 @@ of it stays free.
 
 ### Verification (2026-09-27)
 
-- Gates: `uv run pytest` 135 passed, `uv run ruff check .` clean,
+- Gates: `uv run pytest` 135 passed (134 + 1 skipped in a shallow clone), `uv run ruff check .` clean,
   `npm test` 38 passed, `npm run build` green (JS 223.8 kB / 70.2 kB gzip,
   CSS 4.9 / 1.6 kB).
 - Dry runs against the real pulled data (outputs to a scratch directory, nothing
@@ -239,6 +247,25 @@ Live forward-test panel (pending state), "Where the model wins" segments panel,
 battery sensitivity table, uptime calendar, health panel with the grey
 `gen_nuclear` row — at desktop width and at 375 px. (Checked headless during
 the pass; no screenshot files are committed.)
+
+### What a push to `main` changes live
+
+On the next pipeline run after merge (schedule or dispatch):
+- Health panel: `gen_nuclear` grey "discontinued" instead of red "stale"; new
+  rows for the weekly reports (forecast eval ok, battery backtest "unknown"
+  until re-run, sensitivity "missing" until the first full eval, agent eval
+  "unknown").
+- New panels: uptime calendar (86+ days), live forward-test panel (honest
+  "no ledger yet" until the first morning run records, first scores a day
+  later), market caption under the market charts, "Where the model wins"
+  segment panel, battery sensitivity table (after the first full eval).
+- Page renders in one pass (no layout jumps); tables fit on phones.
+- Workflow: forward forecast at 04:23/06:23 UTC, `score-ledger` every run,
+  sensitivity sweep weekly, deploy retry, full-history checkout; the bot then
+  starts committing `reports/forward_ledger.parquet`,
+  `reports/battery_sensitivity.json` and `site/public/data/{uptime,
+  forward_ledger}.json`.
+- README: updated headline numbers and the live-proof section.
 
 ### Open / Needs Nico
 
