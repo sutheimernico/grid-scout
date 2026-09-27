@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Heatmap } from "./charts/Heatmap";
 import { LineChart } from "./charts/LineChart";
 import { SkillBars } from "./charts/SkillBars";
@@ -17,6 +18,8 @@ import type {
   SegmentAnalysis,
   UptimeData,
 } from "./types";
+
+export const SETTLE_TIMEOUT_MS = 2500;
 
 const COLORS = {
   model: "var(--s1)",
@@ -47,24 +50,50 @@ export default function App() {
   const ledger = useArtifact<ForwardLedgerData>("forward_ledger.json");
   const uptime = useArtifact<UptimeData>("uptime.json");
 
+  // Render the body in one pass once every artifact has settled. Filled in one
+  // by one, the sections pushed each other down (measured CLS ~0.5); all seven
+  // files together are ~40 kB gzipped, so waiting for the slowest costs little.
+  // The timeout keeps one hung request from blanking the whole page.
+  const [waitedLongEnough, setWaitedLongEnough] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setWaitedLongEnough(true), SETTLE_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, []);
+  const settled =
+    waitedLongEnough ||
+    [market, forecast, battery, agent, health, ledger, uptime].every((a) => a.state !== "loading");
+
+  const masthead = (
+    <header className="masthead">
+      <h1>
+        <span className="prompt">▸</span> grid-scout
+      </h1>
+      <p>
+        Self-operating intelligence on the German electricity market: live SMARD data, a
+        walk-forward-validated day-ahead price forecast, and a battery-arbitrage backtest that
+        prices what the forecast is actually worth. Runs entirely on GitHub Actions — no servers.
+      </p>
+      {health.state === "ready" && (
+        <div className="meta">
+          pipeline last ran {new Date(health.data.generated_at).toLocaleString("en-GB", { timeZone: "Europe/Berlin" })} ·
+          data: SMARD / Bundesnetzagentur (CC BY 4.0)
+        </div>
+      )}
+    </header>
+  );
+
+  if (!settled) {
+    return (
+      <>
+        {masthead}
+        <p className="sub">Loading pipeline artifacts…</p>
+      </>
+    );
+  }
+
   return (
     <>
-      <header className="masthead">
-        <h1>
-          <span className="prompt">▸</span> grid-scout
-        </h1>
-        <p>
-          Self-operating intelligence on the German electricity market: live SMARD data, a
-          walk-forward-validated day-ahead price forecast, and a battery-arbitrage backtest that
-          prices what the forecast is actually worth. Runs entirely on GitHub Actions — no servers.
-        </p>
-        {health.state === "ready" && (
-          <div className="meta">
-            pipeline last ran {new Date(health.data.generated_at).toLocaleString("en-GB", { timeZone: "Europe/Berlin" })} ·
-            data: SMARD / Bundesnetzagentur (CC BY 4.0)
-          </div>
-        )}
-      </header>
+      {masthead}
 
       {market.state === "ready" && forecast.state === "ready" && battery.state === "ready" && (
         <section className="section" aria-label="Headline figures">

@@ -1,6 +1,6 @@
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { act, cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import App, { sumMembers } from "./App";
+import App, { SETTLE_TIMEOUT_MS, sumMembers } from "./App";
 import type {
   AgentData,
   BatteryData,
@@ -274,12 +274,29 @@ beforeEach(() => artifacts.clear());
 afterEach(cleanup);
 
 describe("App states", () => {
-  it("shows a loading note per section while artifacts are in flight", () => {
+  it("holds the body back until every artifact has settled", () => {
+    // sections filling in one by one pushed each other down (CLS ~0.5)
     setAll("loading");
+    artifacts.set("market.json", { state: "ready", data: market });
     render(<App />);
-    expect(screen.getByText(/loading market data/)).toBeTruthy();
-    expect(screen.getByText(/loading forecast evaluation/)).toBeTruthy();
-    expect(screen.getByText(/loading battery backtest/)).toBeTruthy();
+    expect(screen.getByText(/Loading pipeline artifacts/)).toBeTruthy();
+    expect(screen.queryByText(/Generation mix/)).toBeNull();
+    expect(screen.queryByText(/loading forecast evaluation/)).toBeNull();
+  });
+
+  it("falls back to a loading note per section when a request hangs", () => {
+    vi.useFakeTimers();
+    try {
+      setAll("loading");
+      render(<App />);
+      act(() => vi.advanceTimersByTime(SETTLE_TIMEOUT_MS));
+      expect(screen.queryByText(/Loading pipeline artifacts/)).toBeNull();
+      expect(screen.getByText(/loading market data/)).toBeTruthy();
+      expect(screen.getByText(/loading forecast evaluation/)).toBeTruthy();
+      expect(screen.getByText(/loading battery backtest/)).toBeTruthy();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("degrades to a pending panel when an artifact was never produced", () => {
