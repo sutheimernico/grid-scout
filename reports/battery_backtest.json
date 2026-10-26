@@ -4,19 +4,19 @@
     "capacity_mwh": 2.0,
     "round_trip_efficiency": 0.86
   },
-  "n_days": 364,
+  "n_days": 363,
   "revenue_eur": {
-    "perfect": 85401.71,
-    "model": 80260.37,
-    "naive": 76502.73
+    "perfect": 85563.62,
+    "model": 79957.93,
+    "naive": 76297.77
   },
   "revenue_eur_per_mw_year": {
-    "perfect": 85636.33,
-    "model": 80480.87,
-    "naive": 76712.9
+    "perfect": 86035.04,
+    "model": 80398.47,
+    "naive": 76718.15
   },
-  "capture_rate_model": 0.9398,
-  "capture_rate_naive": 0.8958,
-  "model_edge_over_naive_eur": 3757.64,
-  "skipped_days": 1
+  "capture_rate_model": 0.9345,
+  "capture_rate_naive": 0.8917,
+  "model_edge_over_naive_eur": 3660.16,
+  "skipped_days": 2
 }
