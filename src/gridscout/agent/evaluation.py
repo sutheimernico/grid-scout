@@ -101,14 +101,7 @@ def build_eval_set(tools: GridTools) -> list[Question]:
     """~30 questions anchored to days verified to exist in the data."""
     coverage = tools.get_data_coverage()["series"]
     last_full = date.fromisoformat(coverage["gen_solar"]["to"]) - timedelta(days=2)
-    days: list[date] = []
-    for offset in (0, 7, 30, 90):
-        candidate = last_full - timedelta(days=offset)
-        for _ in range(10):  # walk further back past data holes
-            if candidate not in days and _usable_day(tools, candidate):
-                days.append(candidate)
-                break
-            candidate -= timedelta(days=1)
+    days = _tuning_days(tools, last_full)
     if len(days) < 4:
         raise RuntimeError("could not find 4 usable eval days — data too sparse")
 
@@ -231,8 +224,153 @@ def build_eval_set(tools: GridTools) -> list[Question]:
     return questions
 
 
-def run_eval(agent, tools: GridTools, reports_dir: Path) -> dict:
-    questions = build_eval_set(tools)
+def build_holdout_set(tools: GridTools) -> list[Question]:
+    """Questions written after the grader was tuned, on days the tuning set never used.
+
+    The 28-question set above was used to find and fix grader gaps (75% -> 96%),
+    so its pass rate is a development number. This set was written afterwards, is
+    graded by the same frozen functions, and is never to be used for tuning: if a
+    failure here looks like a grader gap, record it, do not fix the grader against it.
+    """
+    coverage = tools.get_data_coverage()["series"]
+    last_full = date.fromisoformat(coverage["gen_solar"]["to"]) - timedelta(days=2)
+    used = {d.isoformat() for d in _tuning_days(tools, last_full)}
+    days: list[date] = []
+    for offset in (3, 14, 45, 120):
+        candidate = last_full - timedelta(days=offset)
+        for _ in range(10):  # walk further back past data holes
+            fresh = candidate.isoformat() not in used and candidate not in days
+            if fresh and _usable_day(tools, candidate):
+                days.append(candidate)
+                break
+            candidate -= timedelta(days=1)
+    if len(days) < 4:
+        raise RuntimeError("could not find 4 usable holdout days — data too sparse")
+
+    questions: list[Question] = []
+    for i, d in enumerate(days[:3]):
+        day = d.isoformat()
+        price = tools.get_price_day(day)
+        questions.append(
+            Question(
+                id=f"hold-price-min-{i}",
+                type="factual",
+                text=f"What was the cheapest hourly day-ahead price in Germany on {day}?",
+                grade=lambda a, g=price["min"]["value"]: numeric_match(a, g),
+                gold_display=f"{price['min']['value']} EUR/MWh",
+            )
+        )
+        questions.append(
+            Question(
+                id=f"hold-negative-hours-{i}",
+                type="factual",
+                text=f"On {day}, in how many hours was the German day-ahead price below zero?",
+                grade=lambda a, g=float(price["negative_hours"]): numeric_match(
+                    a, g, rel_tol=0, abs_tol=0.1
+                ),
+                gold_display=f"{price['negative_hours']} hours",
+            )
+        )
+
+    for i, d in enumerate(days[2:4]):
+        day = d.isoformat()
+        mix = tools.get_generation_mix_day(day)
+        total = mix["total"]
+        questions.append(
+            Question(
+                id=f"hold-total-generation-{i}",
+                type="factual",
+                text=f"How much electricity (in MWh) was generated in Germany in total on {day}?",
+                grade=lambda a, g=float(total): numeric_match(a, g, rel_tol=0.02, abs_tol=1.0),
+                gold_display=f"{total} MWh",
+            )
+        )
+
+    week_end = days[0]
+    week_start = week_end - timedelta(days=6)
+    week = tools.get_price_range_summary(week_start.isoformat(), week_end.isoformat())
+    questions.append(
+        Question(
+            id="hold-range-mean",
+            type="analytical",
+            text=f"What was the average day-ahead price from {week_start} to {week_end} inclusive?",
+            grade=lambda a, g=week["mean"]: numeric_match(a, g),
+            gold_display=f"{week['mean']} EUR/MWh",
+        )
+    )
+    questions.append(
+        Question(
+            id="hold-range-max",
+            type="analytical",
+            text=f"What was the highest day-ahead price between {week_start} and {week_end}?",
+            grade=lambda a, g=week["max"]["value"]: numeric_match(a, g),
+            gold_display=f"{week['max']['value']} EUR/MWh",
+        )
+    )
+
+    eval_report = tools.get_forecast_evaluation()
+    battery = tools.get_battery_results()
+    reports = [
+        ("rmse", "What is the RMSE of grid-scout's LightGBM price forecast?",
+         eval_report["models"]["lgbm_point"]["rmse"], "EUR/MWh"),
+        ("snaive-mae", "How large is the MAE of the same-weekday-last-week baseline?",
+         eval_report["models"]["seasonal_naive_7d"]["mae"], "EUR/MWh"),
+        ("naive-revenue", "What yearly revenue does the battery earn when scheduled "
+         "on the naive forecast?", battery["revenue_eur"]["naive"], "EUR"),
+    ]
+    for key, text, gold, unit in reports:
+        questions.append(
+            Question(
+                id=f"hold-report-{key}",
+                type="report",
+                text=text,
+                grade=lambda a, g=gold: numeric_match(a, g, rel_tol=0.02, abs_tol=1.0),
+                gold_display=f"{round(gold, 2)} {unit}",
+            )
+        )
+
+    traps = [
+        ("brent", "What did Brent crude oil close at yesterday?"),
+        ("austria", "What was the Austrian day-ahead electricity price this morning?"),
+        ("wind-speed", "What was the average wind speed in the North Sea last night?"),
+        ("next-month", "Predict the average German power price for next month."),
+        ("heat-pump", "Which heat pump should I buy to profit from cheap midday electricity?"),
+        ("past-gap", "What was the German day-ahead price on 1999-12-31?"),
+    ]
+    for key, text in traps:
+        questions.append(
+            Question(
+                id=f"hold-trap-{key}",
+                type="trap",
+                text=text,
+                grade=refusal_like,
+                gold_display="must decline (no data / out of scope)",
+            )
+        )
+    return questions
+
+
+def _tuning_days(tools: GridTools, last_full: date) -> list[date]:
+    """The anchor days build_eval_set picks, so the holdout can avoid them."""
+    days: list[date] = []
+    for offset in (0, 7, 30, 90):
+        candidate = last_full - timedelta(days=offset)
+        for _ in range(10):
+            if candidate not in days and _usable_day(tools, candidate):
+                days.append(candidate)
+                break
+            candidate -= timedelta(days=1)
+    return days
+
+
+def run_eval(
+    agent,
+    tools: GridTools,
+    reports_dir: Path,
+    questions: list[Question] | None = None,
+    filename: str = "agent_eval.json",
+) -> dict:
+    questions = questions if questions is not None else build_eval_set(tools)
     results = []
     for q in questions:
         res = agent.ask(q.text)
@@ -271,5 +409,5 @@ def run_eval(agent, tools: GridTools, reports_dir: Path) -> dict:
         "results": results,
     }
     reports_dir.mkdir(parents=True, exist_ok=True)
-    (reports_dir / "agent_eval.json").write_text(json.dumps(report, indent=2) + "\n")
+    (reports_dir / filename).write_text(json.dumps(report, indent=2) + "\n")
     return report

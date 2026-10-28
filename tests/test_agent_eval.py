@@ -134,3 +134,50 @@ class TestEvalSetDaySelection:
         tools = GT(data_dir=data, reports_dir=tmp_path)
         assert not _usable_day(tools, date(2024, 3, 5))
         assert _usable_day(tools, date(2024, 3, 4))
+
+
+class TestHoldoutSet:
+    @pytest.fixture
+    def long_tools(self, tmp_path):
+        import numpy as np
+
+        from tests.test_export import write_series
+
+        data = tmp_path / "d"
+        n = 24 * 300
+        rng = np.random.default_rng(3)
+        write_series(data, "price_day_ahead", rng.normal(90, 30, n), start_ms=1704063600000)
+        for name in ["load", "gen_solar", "gen_wind_onshore", "gen_wind_offshore", "gen_gas"]:
+            write_series(data, name, rng.uniform(100, 20_000, n), start_ms=1704063600000)
+        tools = GridTools(data_dir=data, reports_dir=tmp_path)
+        models = {"lgbm_point": {"mae": 10.0, "rmse": 14.0}, "naive_yesterday": {"mae": 20.0},
+                  "seasonal_naive_7d": {"mae": 25.0}}
+        skill = {"lgbm_vs_naive_pct": 50}
+        tools.get_forecast_evaluation = lambda: {"models": models, "skill": skill}
+        tools.get_battery_results = lambda: {
+            "capture_rate_model": 0.9, "model_edge_over_naive_eur": 1.0,
+            "revenue_eur": {"perfect": 3.0, "naive": 2.0, "model": 2.5},
+        }
+        return tools
+
+    def test_holdout_is_disjoint_from_the_tuning_set(self, long_tools):
+        import re
+
+        from gridscout.agent.evaluation import build_eval_set, build_holdout_set
+
+        day_re = re.compile(r"\d{4}-\d{2}-\d{2}")
+        dev = build_eval_set(long_tools)
+        hold = build_holdout_set(long_tools)
+        dev_days = {d for q in dev for d in day_re.findall(q.text)}
+        hold_days = {d for q in hold for d in day_re.findall(q.text)}
+        assert hold_days
+        assert not dev_days & hold_days
+        assert not {q.text for q in dev} & {q.text for q in hold}
+        assert {q.type for q in hold} == {"factual", "analytical", "report", "trap"}
+
+    def test_holdout_gold_answers_pass_their_own_grader(self, long_tools):
+        from gridscout.agent.evaluation import build_holdout_set
+
+        for q in build_holdout_set(long_tools):
+            if q.type != "trap":
+                assert q.grade(q.gold_display), q.id
