@@ -131,7 +131,7 @@ class TestFaultIsolation:
         assert run.ok
         assert len(run.results) == len(self.NAMES)
 
-    def test_cli_exits_non_zero_after_attempting_everything(
+    def test_cli_degrades_partial_failure_to_a_warning(
         self, fake_smard, tmp_path, monkeypatch
     ):
         self._stub_weeks(fake_smard)
@@ -154,7 +154,29 @@ class TestFaultIsolation:
             ["ingest", "--data-dir", str(tmp_path / "data")]
             + [arg for name in self.NAMES for arg in ("-s", name)],
         )
-        assert result.exit_code == 1
+        assert result.exit_code == 0
+        assert "::warning title=ingest gen_solar::" in result.output
         assert "gen_solar: FAILED" in result.output
         assert "1 of 5 series failed" in result.output
         assert "price_day_ahead:" in result.output  # the healthy ones still ran
+
+    def test_cli_still_fails_when_nothing_ingests(self, fake_smard, tmp_path, monkeypatch):
+        self._stub_weeks(fake_smard)
+        monkeypatch.setattr(
+            "gridscout.cli.SmardClient",
+            lambda **kw: SmardClient(
+                cache_dir=tmp_path / "cache", transport=fake_smard.transport, request_delay_s=0
+            ),
+        )
+
+        def always_fails(client, spec, data_dir, start):
+            raise RuntimeError("SMARD is down")
+
+        monkeypatch.setattr("gridscout.smard.ingest.ingest_series", always_fails)
+        result = CliRunner().invoke(
+            app,
+            ["ingest", "--data-dir", str(tmp_path / "data")]
+            + [arg for name in self.NAMES for arg in ("-s", name)],
+        )
+        assert result.exit_code == 1
+        assert "5 of 5 series failed" in result.output

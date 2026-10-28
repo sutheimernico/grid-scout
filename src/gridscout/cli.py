@@ -42,15 +42,17 @@ def ingest(
         marker = " ⚠" if r.report.warnings else ""
         typer.echo(f"{r.series}: {r.n_rows} rows ({r.weeks_fetched} weeks fetched){marker}")
     if run.failures:
-        # Every series was attempted first; exiting non-zero keeps the workflow's
-        # issue alert intact without letting one bad series skip the rest.
+        # A single series timing out is routine (SMARD is flaky) and must not turn
+        # the pipeline red: the old Parquet stays in place and the health panel
+        # shows the series going stale. Only a run where nothing could be fetched
+        # is a real outage that should open the failure issue.
+        total = len(run.results) + len(run.failures)
         for name, error in run.failures:
+            typer.echo(f"::warning title=ingest {name}::{error}", err=True)
             typer.echo(f"{name}: FAILED - {error}", err=True)
-        typer.echo(
-            f"{len(run.failures)} of {len(run.results) + len(run.failures)} series failed",
-            err=True,
-        )
-        raise typer.Exit(1)
+        typer.echo(f"{len(run.failures)} of {total} series failed", err=True)
+        if not run.results:
+            raise typer.Exit(1)
 
 
 @app.command("forecast-eval")
