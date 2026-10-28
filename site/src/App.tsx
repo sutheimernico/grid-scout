@@ -201,9 +201,11 @@ export default function App() {
         <div className="kicker">Forecast</div>
         <h2>Predicting tomorrow&apos;s prices — measured honestly</h2>
         <p className="sub">
-          A LightGBM model predicts all 24 hourly prices before the day-ahead auction closes, using
-          only information available at that moment (a perturbation test enforces this). Every
-          number below is out-of-sample: expanding walk-forward over a full year, refit weekly.
+          A LightGBM model predicts all 24 hourly prices of the next day. The backtest assumes the
+          grid operators&apos; generation forecasts for that day are known at gate closure, as they
+          are for a trader with TSO feeds; SMARD itself publishes them only after the auction, so
+          the table below also scores the model on strictly pre-auction inputs. Every number is
+          out-of-sample: expanding walk-forward over a full year, refit weekly.
         </p>
         <LiveForecast ledger={ledger} />
         {forecast.state === "ready" ? (
@@ -213,7 +215,11 @@ export default function App() {
               <p className="panel-sub">
                 point forecast with p10–p90 band · band coverage{" "}
                 {(forecast.data.eval.quantiles.coverage_p10_p90 * 100).toFixed(0)}% (target 80% — the
-                band is honestly too narrow)
+                raw band is too narrow
+                {forecast.data.eval.quantiles.conformal
+                  ? `; after walk-forward conformal calibration ${(forecast.data.eval.quantiles.conformal.coverage_p10_p90 * 100).toFixed(0)}%`
+                  : ""}
+                )
               </p>
               <LineChart
                 series={[
@@ -250,17 +256,27 @@ export default function App() {
                 <tbody>
                   {(
                     [
-                      ["lgbm_point", "LightGBM (14 features)"],
+                      ["lgbm_point", "LightGBM, TSO forecast for day D (gate-closure assumption)"],
                       ["naive_yesterday", "Naive: yesterday's prices"],
                       ["seasonal_naive_7d", "Seasonal naive: last week"],
+                      ["ridge_per_hour", "Ridge per hour (linear, LEAR-style)"],
                     ] as const
-                  ).map(([key, label]) => (
-                    <tr key={key}>
-                      <td>{label}</td>
-                      <td>{forecast.data.eval.models[key].mae.toFixed(2)}</td>
-                      <td>{forecast.data.eval.models[key].rmse.toFixed(2)}</td>
+                  )
+                    .filter(([key]) => forecast.data.eval.models[key])
+                    .map(([key, label]) => (
+                      <tr key={key}>
+                        <td>{label}</td>
+                        <td>{forecast.data.eval.models[key].mae.toFixed(2)}</td>
+                        <td>{forecast.data.eval.models[key].rmse.toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  {forecast.data.eval.pre_auction && (
+                    <tr>
+                      <td>LightGBM, strictly pre-auction SMARD inputs</td>
+                      <td>{forecast.data.eval.pre_auction.models.lgbm_pre_auction.mae.toFixed(2)}</td>
+                      <td>{forecast.data.eval.pre_auction.models.lgbm_pre_auction.rmse.toFixed(2)}</td>
                     </tr>
-                  ))}
+                  )}
                 </tbody>
               </table>
             </div>
@@ -355,8 +371,16 @@ export default function App() {
                 label="Overall pass rate"
                 value={(agent.data.pass_rate * 100).toFixed(0)}
                 unit="%"
-                hint={`${agent.data.n} questions · ${agent.data.model}, local`}
+                hint={`${agent.data.n} development questions · ${agent.data.model}, local — grader tuned on these`}
               />
+              {agent.data.holdout && (
+                <Tile
+                  label="Untuned holdout"
+                  value={(agent.data.holdout.pass_rate * 100).toFixed(0)}
+                  unit="%"
+                  hint={`${agent.data.holdout.passed}/${agent.data.holdout.n} questions written after tuning`}
+                />
+              )}
               {Object.entries(agent.data.by_type).map(([type, s]) => (
                 <Tile
                   key={type}
@@ -368,7 +392,12 @@ export default function App() {
             </div>
             <div className="panel">
               <p className="panel-title">Sample transcripts — including failures</p>
-              <p className="panel-sub">curated one pass + one fail per question type</p>
+              <p className="panel-sub">
+                curated one pass + one fail per question type
+                {agent.data.generated_utc
+                  ? ` · recorded ${agent.data.generated_utc.slice(0, 10)}; figures quote that day's data, not today's`
+                  : ""}
+              </p>
               {agent.data.examples.map((ex, i) => (
                 <div className="transcript" key={i}>
                   <div className="t-q">
@@ -407,9 +436,9 @@ export default function App() {
           <>
             <div className="health-list">
               {Object.entries(health.data.series).map(([name, s]) => (
-                <div className="health-item" key={name} title={s.note}>
+                <div className="health-item" key={name} title={s.note ?? name}>
                   <span className="dot" style={{ background: healthColor(s.status) }} />
-                  <span>{name}</span>
+                  <span className="name">{s.label ?? name}</span>
                   <span className="age">{healthAge(s)}</span>
                 </div>
               ))}
@@ -473,7 +502,10 @@ function reportAge(r: ReportEntry): string {
 
 function healthAge(s: HealthEntry): string {
   if (s.status === "missing") return "missing";
-  if (s.status === "discontinued") return "discontinued";
+  if (s.status === "discontinued") return "retired";
+  // Forecast series run into the future, so their "age" is negative: show how far
+  // ahead they reach instead of a nonsensical "-21.2h".
+  if (s.age_hours != null && s.age_hours < 0) return `reaches +${Math.round(-s.age_hours)} h`;
   return `${s.age_hours}h`;
 }
 

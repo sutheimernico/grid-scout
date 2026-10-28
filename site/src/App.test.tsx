@@ -143,6 +143,12 @@ const health: HealthData = {
       note: "German nuclear phase-out",
     },
     gen_solar: { status: "stale", age_hours: 120.0, rows: 100 },
+    forecast_wind_onshore: {
+      status: "ok",
+      label: "Forecast: wind onshore",
+      age_hours: -21.2,
+      rows: 50,
+    },
     forecast_solar: { status: "missing" },
   },
   reports: {
@@ -461,6 +467,15 @@ describe("uptime calendar", () => {
 });
 
 describe("health panel", () => {
+  it("shows human labels and never a negative age for forecast series", () => {
+    setReady();
+    const { container } = render(<App />);
+    const rows = Array.from(container.querySelectorAll(".health-item")) as HTMLElement[];
+    const wind = rows.find((r) => within(r).queryByText("Forecast: wind onshore"))!;
+    expect(within(wind).getByText("reaches +21 h")).toBeTruthy();
+    expect(container.textContent).not.toContain("-21.2h");
+  });
+
   it("never paints a discontinued series as a fault", () => {
     setReady();
     const { container } = render(<App />);
@@ -468,7 +483,7 @@ describe("health panel", () => {
     const byName = (name: string) => rows.find((r) => within(r).queryByText(name))!;
 
     const nuclear = byName("gen_nuclear");
-    expect(within(nuclear).getByText("discontinued")).toBeTruthy();
+    expect(within(nuclear).getByText("retired")).toBeTruthy();
     expect(nuclear.querySelector(".dot")!.getAttribute("style")).toContain("--ink-muted");
     expect(nuclear.getAttribute("title")).toContain("phase-out");
 
@@ -506,7 +521,7 @@ describe("derived report freshness", () => {
     artifacts.set("health.json", { state: "ready", data: { ...health, reports: undefined } });
     const { container } = render(<App />);
     expect(container.textContent).not.toContain("Derived reports");
-    expect(container.querySelectorAll(".health-item").length).toBe(4);
+    expect(container.querySelectorAll(".health-item").length).toBe(5);
   });
 });
 

@@ -66,6 +66,12 @@ export interface ForecastData {
       pinball_q90: number;
       coverage_p10_p90: number;
       target_coverage: number;
+      conformal?: { coverage_p10_p90: number; mean_width_calibrated: number };
+    };
+    /** same walk-forward on inputs published before the auction (absent in old exports) */
+    pre_auction?: {
+      skill_vs_naive_pct: number;
+      models: Record<string, { mae: number; rmse: number }>;
     };
     skill: { lgbm_vs_naive_pct: number; lgbm_vs_seasonal_naive_pct: number };
     finding: string;
@@ -119,6 +125,10 @@ export interface BatteryData {
 
 export interface AgentData {
   model: string;
+  /** when the eval ran; the transcripts quote that day's data, not today's */
+  generated_utc?: string | null;
+  /** questions written after the grader was tuned; never used for tuning */
+  holdout?: { n: number; passed: number; pass_rate: number };
   n: number;
   pass_rate: number;
   by_type: Record<string, { n: number; passed: number; pass_rate: number }>;
@@ -137,6 +147,8 @@ export type HealthStatus = "ok" | "stale" | "discontinued" | "missing";
 
 export interface HealthEntry {
   status: HealthStatus;
+  /** human-readable series name from the pipeline's series registry */
+  label?: string;
   last_value_at?: string;
   age_hours?: number;
   rows?: number;

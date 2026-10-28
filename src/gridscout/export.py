@@ -193,14 +193,20 @@ def export_agent(reports_dir: Path, examples_per_type: int = 2) -> dict:
                         "tools_used": [c["tool"] for c in r["tool_calls"]],
                     }
                 )
-    return {
+    out = {
         "model": report["model"],
+        "generated_utc": report.get("generated_utc"),
         "n": report["n"],
         "pass_rate": report["pass_rate"],
         "by_type": report["by_type"],
         "grading": report["grading"],
         "examples": examples,
     }
+    holdout_path = reports_dir / "agent_eval_holdout.json"
+    if holdout_path.exists():
+        holdout = json.loads(holdout_path.read_text())
+        out["holdout"] = {k: holdout[k] for k in ("n", "passed", "pass_rate", "by_type")}
+    return out
 
 
 @dataclass(frozen=True)
@@ -431,13 +437,14 @@ def export_health(data_dir: Path, reports_dir: Path | None = None) -> dict:
     for name, spec in SERIES.items():
         path = data_dir / f"{name}.parquet"
         if not path.exists():
-            series[name] = {"status": "missing"}
+            series[name] = {"status": "missing", "label": spec.label}
             continue
         s = _read(data_dir, name).dropna()
         age_hours = (datetime.now(UTC) - s.index.max()).total_seconds() / 3600
         stale_after = 48 if spec.kind in (Kind.PRICE, Kind.FORECAST) else 96
         entry = {
             "status": "stale" if age_hours > stale_after else "ok",
+            "label": spec.label,
             "last_value_at": s.index.max().isoformat(),
             "age_hours": round(age_hours, 1),
             "rows": int(len(s)),

@@ -255,3 +255,42 @@ class TestUptime:
 
         with pytest.raises(FileNotFoundError):
             export_uptime(tmp_path, tmp_path / "nothing.json")
+
+
+def test_health_entries_carry_a_human_label(data_dir):
+    health = export_health(data_dir)
+    assert health["series"]["price_day_ahead"]["label"] == "Day-ahead price DE/LU"
+    assert health["series"]["forecast_solar"]["label"]  # missing series keep it too
+
+
+class TestAgentExport:
+    def _report(self, passed, n):
+        return {
+            "model": "m",
+            "generated_utc": "2026-10-28T12:00:00+00:00",
+            "n": n,
+            "passed": passed,
+            "pass_rate": passed / n,
+            "by_type": {"factual": {"n": n, "passed": passed, "pass_rate": passed / n}},
+            "grading": "programmatic",
+            "results": [
+                {
+                    "type": "factual",
+                    "question": "q",
+                    "answer": "a",
+                    "gold": "1",
+                    "passed": True,
+                    "tool_calls": [],
+                }
+            ],
+        }
+
+    def test_dated_and_holdout_reported_when_present(self, tmp_path):
+        from gridscout.export import export_agent
+
+        (tmp_path / "agent_eval.json").write_text(json.dumps(self._report(9, 10)))
+        assert "holdout" not in export_agent(tmp_path)
+        (tmp_path / "agent_eval_holdout.json").write_text(json.dumps(self._report(6, 10)))
+        out = export_agent(tmp_path)
+        assert out["generated_utc"].startswith("2026-10-28")
+        assert out["holdout"]["pass_rate"] == 0.6
