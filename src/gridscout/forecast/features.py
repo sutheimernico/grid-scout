@@ -1,22 +1,25 @@
 """Feature matrix for the day-ahead price forecast.
 
-Availability contract — the model predicts all 24 hourly prices of day D at
-D-1 ~12:00 Europe/Berlin, i.e. before EPEX day-ahead gate closure. At that
-moment the following is known and nothing else:
+Two feature sets, because availability and honesty are not the same thing:
 
-- day-ahead prices through the END of D-1 (auctioned on D-2), so price lags
-  of >= 1 day are safe;
-- realized load/generation only through D-2 (D-1 is still incomplete at noon),
-  so realization lags must be >= 2 days;
-- SMARD's published generation forecasts FOR day D (wind/solar/total). Caveat,
-  documented honestly: SMARD stores the latest forecast revision, not the
-  auction-time snapshot — treated as day-ahead information here.
+- `FULL` (the backtest) predicts all 24 hourly prices of day D as of D-1 ~12:00
+  Europe/Berlin and assumes the TSOs' generation forecasts FOR day D (wind,
+  solar, total) are known at gate closure, as they are for a trader with TSO
+  feeds. Everything else is lagged: day-ahead prices through the end of D-1,
+  realized load only through D-2 (D-1 is incomplete at noon).
+- `PRE_AUCTION` (the live forward test) uses only inputs SMARD has published
+  before the auction. SMARD republishes its generation forecast for day D only
+  17-21 UTC on D-1 (measured, see forward.py) and stores the latest revision,
+  so for a SMARD-only pipeline the `FULL` inputs are not available at 12:00.
+  The backtest reports both, side by side.
+
+What the perturbation tests prove: lagged inputs cannot leak (shifting is by
+whole days, and poisoning values dated on D does not move D's lagged features).
+What they cannot prove: when SMARD published each value. That is pinned
+separately in tests/test_preauction.py against measured publication times.
 
 Lags are exact multiples of 24 absolute hours. Around DST switches this
 misaligns local hour by one for a single day — accepted simplification.
-
-The leakage test in tests/test_features.py enforces this contract by
-perturbation, not by trust.
 """
 
 from dataclasses import dataclass
