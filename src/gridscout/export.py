@@ -26,6 +26,7 @@ def _round_long_floats(text: str) -> str:
     """Display hygiene: '15.253157140946763' -> '15.25' inside gold strings."""
     return re.sub(r"\d+\.\d{4,}", lambda m: f"{float(m.group()):.2f}", text)
 
+
 GENERATION_ORDER = [
     # stack order for the mix chart: baseload-ish bottom, volatile top
     "gen_biomass",
@@ -226,9 +227,7 @@ class ReportSpec:
 
 # Written by the weekly full-eval run; the 3-hourly run only refreshes raw data.
 REPORT_SPECS: dict[str, ReportSpec] = {
-    "forecast_eval.json": ReportSpec(
-        "Forecast walk-forward eval", "generated_utc", cadence_days=7
-    ),
+    "forecast_eval.json": ReportSpec("Forecast walk-forward eval", "generated_utc", cadence_days=7),
     "battery_backtest.json": ReportSpec("Battery backtest", "generated_utc", cadence_days=7),
     "battery_sensitivity.json": ReportSpec(
         "Battery sensitivity sweep", "generated_utc", cadence_days=7

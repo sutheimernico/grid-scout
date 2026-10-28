@@ -58,7 +58,6 @@ def validate_series(spec: SeriesSpec, df: pd.DataFrame) -> ValidationReport:
     out_of_bounds = out_of_bounds[(out_of_bounds < low) | (out_of_bounds > high)]
     if len(out_of_bounds):
         report.errors.append(
-            f"{len(out_of_bounds)} values outside [{low}, {high}], "
-            f"e.g. {out_of_bounds.iloc[0]}"
+            f"{len(out_of_bounds)} values outside [{low}, {high}], e.g. {out_of_bounds.iloc[0]}"
         )
     return report

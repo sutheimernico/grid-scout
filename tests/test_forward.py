@@ -306,9 +306,12 @@ class TestCli:
             app,
             [
                 "forecast-tomorrow",
-                "--data-dir", str(data_dir),
-                "--reports-dir", str(tmp_path / "reports"),
-                "--target-date", str(TARGET_DAY + timedelta(days=3)),
+                "--data-dir",
+                str(data_dir),
+                "--reports-dir",
+                str(tmp_path / "reports"),
+                "--target-date",
+                str(TARGET_DAY + timedelta(days=3)),
             ],
         )
         assert result.exit_code == 0
@@ -323,9 +326,12 @@ class TestCli:
             app,
             [
                 "forecast-tomorrow",
-                "--data-dir", str(data_dir),
-                "--reports-dir", str(tmp_path / "reports"),
-                "--target-date", str(TARGET_DAY),
+                "--data-dir",
+                str(data_dir),
+                "--reports-dir",
+                str(tmp_path / "reports"),
+                "--target-date",
+                str(TARGET_DAY),
             ],
         )
         assert result.exit_code == 0

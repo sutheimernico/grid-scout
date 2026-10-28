@@ -84,8 +84,12 @@ def ingest_series(
             .reset_index(drop=True)
         )
     else:
-        merged = existing if existing is not None else pd.DataFrame(
-            {"timestamp_ms": pd.Series(dtype="int64"), "value": pd.Series(dtype="float64")}
+        merged = (
+            existing
+            if existing is not None
+            else pd.DataFrame(
+                {"timestamp_ms": pd.Series(dtype="int64"), "value": pd.Series(dtype="float64")}
+            )
         )
 
     merged = merged.astype({"timestamp_ms": "int64", "value": "float64"})
@@ -105,9 +109,7 @@ def ingest_series(
     return IngestResult(spec.name, weeks_fetched, len(merged), report)
 
 
-def ingest_all(
-    client: SmardClient, data_dir: Path, names: list[str] | None = None
-) -> IngestRun:
+def ingest_all(client: SmardClient, data_dir: Path, names: list[str] | None = None) -> IngestRun:
     """Ingest every requested series, isolating failures.
 
     One glitchy SMARD response must not cost the whole 3-hourly run: each series

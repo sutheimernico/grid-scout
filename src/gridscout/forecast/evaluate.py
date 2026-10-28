@@ -157,9 +157,7 @@ def evaluate(data_dir: Path, config: EvalConfig | None = None) -> tuple[dict, pd
     report["skill"] = {
         "lgbm_vs_naive_pct": round(100 * (1 - lgbm / naive), 1),
         "lgbm_vs_seasonal_naive_pct": round(100 * (1 - lgbm / snaive), 1),
-        "lgbm_vs_ridge_pct": round(
-            100 * (1 - lgbm / report["models"]["ridge_per_hour"]["mae"]), 1
-        ),
+        "lgbm_vs_ridge_pct": round(100 * (1 - lgbm / report["models"]["ridge_per_hour"]["mae"]), 1),
     }
     report["finding"] = _verdict(report)
     return report, predictions
@@ -181,10 +179,7 @@ def _verdict(report: dict) -> str:
             f"(MAE {mae:.2f} EUR/MWh)."
         )
     else:
-        head = (
-            f"LightGBM beats the naive baseline by {skill:+.1f}% "
-            f"(MAE {mae:.2f} EUR/MWh)."
-        )
+        head = f"LightGBM beats the naive baseline by {skill:+.1f}% (MAE {mae:.2f} EUR/MWh)."
     pre = report["pre_auction"]["models"]["lgbm_pre_auction"]["mae"]
     ridge = report["models"]["ridge_per_hour"]["mae"]
     cal = report["quantiles"]["conformal"]["coverage_p10_p90"]

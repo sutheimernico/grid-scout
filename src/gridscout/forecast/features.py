@@ -128,9 +128,7 @@ def build_matrix(
     out["day_of_week"] = local.dayofweek
     out["month"] = local.month
     out["is_weekend"] = (local.dayofweek >= 5).astype(int)
-    out["is_holiday"] = pd.Series(local.date, index=out.index).map(
-        lambda d: int(d in de_holidays)
-    )
+    out["is_holiday"] = pd.Series(local.date, index=out.index).map(lambda d: int(d in de_holidays))
     out["local_day"] = pd.Series(local.date, index=out.index)
 
     drop_cols = ["local_day"] if require_target else ["local_day", "target"]

@@ -66,9 +66,7 @@ def extract_numbers(text: str) -> list[float]:
 
 
 def numeric_match(answer: str, gold: float, rel_tol: float = 0.02, abs_tol: float = 0.51) -> bool:
-    return any(
-        abs(n - gold) <= max(abs_tol, abs(gold) * rel_tol) for n in extract_numbers(answer)
-    )
+    return any(abs(n - gold) <= max(abs_tol, abs(gold) * rel_tol) for n in extract_numbers(answer))
 
 
 def refusal_like(answer: str) -> bool:
@@ -139,8 +137,10 @@ def build_eval_set(tools: GridTools) -> list[Question]:
                 id=f"renewables-share-{i}",
                 type="factual",
                 text=f"What share of German electricity generation was renewable on {day}?",
-                grade=lambda a, g=share_pct: numeric_match(a, g, rel_tol=0.03, abs_tol=1.1)
-                or numeric_match(a, g / 100, abs_tol=0.02),
+                grade=lambda a, g=share_pct: (
+                    numeric_match(a, g, rel_tol=0.03, abs_tol=1.1)
+                    or numeric_match(a, g / 100, abs_tol=0.02)
+                ),
                 gold_display=f"{share_pct}%",
             )
         )
@@ -174,19 +174,43 @@ def build_eval_set(tools: GridTools) -> list[Question]:
     eval_report = tools.get_forecast_evaluation()
     battery = tools.get_battery_results()
     reports = [
-        ("mae", "What is the MAE of grid-scout's price forecast?",
-         eval_report["models"]["lgbm_point"]["mae"], "EUR/MWh"),
-        ("skill", "By how many percent does the forecast beat the naive baseline?",
-         eval_report["skill"]["lgbm_vs_naive_pct"], "%"),
-        ("naive-mae", "What MAE does the naive yesterday-baseline achieve?",
-         eval_report["models"]["naive_yesterday"]["mae"], "EUR/MWh"),
-        ("capture", "What capture rate does the battery reach with the model forecast?",
-         battery["capture_rate_model"] * 100, "% (also accept the raw ratio)"),
-        ("edge", "How much more revenue per year does the model forecast earn over "
-         "the naive forecast for the battery?",
-         battery["model_edge_over_naive_eur"], "EUR"),
-        ("perfect", "What would the battery earn with perfect price foresight?",
-         battery["revenue_eur"]["perfect"], "EUR"),
+        (
+            "mae",
+            "What is the MAE of grid-scout's price forecast?",
+            eval_report["models"]["lgbm_point"]["mae"],
+            "EUR/MWh",
+        ),
+        (
+            "skill",
+            "By how many percent does the forecast beat the naive baseline?",
+            eval_report["skill"]["lgbm_vs_naive_pct"],
+            "%",
+        ),
+        (
+            "naive-mae",
+            "What MAE does the naive yesterday-baseline achieve?",
+            eval_report["models"]["naive_yesterday"]["mae"],
+            "EUR/MWh",
+        ),
+        (
+            "capture",
+            "What capture rate does the battery reach with the model forecast?",
+            battery["capture_rate_model"] * 100,
+            "% (also accept the raw ratio)",
+        ),
+        (
+            "edge",
+            "How much more revenue per year does the model forecast earn over "
+            "the naive forecast for the battery?",
+            battery["model_edge_over_naive_eur"],
+            "EUR",
+        ),
+        (
+            "perfect",
+            "What would the battery earn with perfect price foresight?",
+            battery["revenue_eur"]["perfect"],
+            "EUR",
+        ),
     ]
     for key, text, gold, unit in reports:
         grade = (
@@ -195,15 +219,23 @@ def build_eval_set(tools: GridTools) -> list[Question]:
             else (lambda a, g=gold: numeric_match(a, g, rel_tol=0.02, abs_tol=1.0))
         )
         questions.append(
-            Question(id=f"report-{key}", type="report", text=text, grade=grade,
-                     gold_display=f"{round(gold, 2)} {unit}")
+            Question(
+                id=f"report-{key}",
+                type="report",
+                text=text,
+                grade=grade,
+                gold_display=f"{round(gold, 2)} {unit}",
+            )
         )
 
     traps = [
         ("fr-price", "What was the French day-ahead power price yesterday?"),
         ("gas-ttf", "What is the current Dutch TTF natural gas price?"),
-        ("future", "What will the German day-ahead price be on "
-         f"{(last_full + timedelta(days=90)).isoformat()}?"),
+        (
+            "future",
+            "What will the German day-ahead price be on "
+            f"{(last_full + timedelta(days=90)).isoformat()}?",
+        ),
         ("ancient", "What was the German day-ahead price on 2005-06-01?"),
         ("stock", "Should I buy shares of RWE based on these power prices?"),
         ("intraday", "What was the German intraday continuous price at 15:30 yesterday?"),
@@ -311,12 +343,24 @@ def build_holdout_set(tools: GridTools) -> list[Question]:
     eval_report = tools.get_forecast_evaluation()
     battery = tools.get_battery_results()
     reports = [
-        ("rmse", "What is the RMSE of grid-scout's LightGBM price forecast?",
-         eval_report["models"]["lgbm_point"]["rmse"], "EUR/MWh"),
-        ("snaive-mae", "How large is the MAE of the same-weekday-last-week baseline?",
-         eval_report["models"]["seasonal_naive_7d"]["mae"], "EUR/MWh"),
-        ("naive-revenue", "What yearly revenue does the battery earn when scheduled "
-         "on the naive forecast?", battery["revenue_eur"]["naive"], "EUR"),
+        (
+            "rmse",
+            "What is the RMSE of grid-scout's LightGBM price forecast?",
+            eval_report["models"]["lgbm_point"]["rmse"],
+            "EUR/MWh",
+        ),
+        (
+            "snaive-mae",
+            "How large is the MAE of the same-weekday-last-week baseline?",
+            eval_report["models"]["seasonal_naive_7d"]["mae"],
+            "EUR/MWh",
+        ),
+        (
+            "naive-revenue",
+            "What yearly revenue does the battery earn when scheduled on the naive forecast?",
+            battery["revenue_eur"]["naive"],
+            "EUR",
+        ),
     ]
     for key, text, gold, unit in reports:
         questions.append(
@@ -382,9 +426,7 @@ def run_eval(
                 "question": q.text,
                 "gold": q.gold_display,
                 "answer": res.answer,
-                "tool_calls": [
-                    {"tool": c["tool"], "args": c["args"]} for c in res.tool_calls
-                ],
+                "tool_calls": [{"tool": c["tool"], "args": c["args"]} for c in res.tool_calls],
                 "rounds": res.rounds,
                 "passed": passed,
                 "agent_error": res.error,

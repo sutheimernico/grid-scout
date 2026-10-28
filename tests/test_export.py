@@ -92,8 +92,12 @@ class TestBatteryExport:
         reports.mkdir()
         (reports / "battery_backtest.json").write_text(json.dumps({"n_days": 2}))
         pd.DataFrame(
-            {"local_day": ["2025-01-01", "2025-01-02"], "perfect": [10.0, 20.0],
-             "model": [8.0, 18.0], "naive": [7.0, 15.0]}
+            {
+                "local_day": ["2025-01-01", "2025-01-02"],
+                "perfect": [10.0, 20.0],
+                "model": [8.0, 18.0],
+                "naive": [7.0, 15.0],
+            }
         ).to_parquet(reports / "battery_daily.parquet")
         return reports
 
@@ -191,9 +195,7 @@ class TestForwardLedgerExport:
         from gridscout.forecast.forward import write_ledger
 
         reports = tmp_path / "reports"
-        write_ledger(
-            reports, [self._record("2026-09-18", True), self._record("2026-09-19", False)]
-        )
+        write_ledger(reports, [self._record("2026-09-18", True), self._record("2026-09-19", False)])
         payload = export_forward_ledger(reports)
         assert payload["summary"]["n_scored"] == 1
         assert payload["summary"]["n_pending"] == 1
@@ -216,7 +218,10 @@ class TestUptime:
         repo = Path(__file__).resolve().parent.parent
         shallow = subprocess.run(
             ["git", "rev-parse", "--is-shallow-repository"],
-            cwd=repo, capture_output=True, text=True, check=False,
+            cwd=repo,
+            capture_output=True,
+            text=True,
+            check=False,
         ).stdout.strip()
         if shallow != "false":
             # CI's default checkout has one commit; the pipeline itself fetches the
@@ -231,9 +236,7 @@ class TestUptime:
         assert dates == sorted(dates)
         assert len(set(dates)) == len(dates)
 
-    def test_merges_the_previous_calendar_so_a_shallow_clone_cannot_lose_history(
-        self, tmp_path
-    ):
+    def test_merges_the_previous_calendar_so_a_shallow_clone_cannot_lose_history(self, tmp_path):
         from gridscout.export import export_uptime
 
         previous = tmp_path / "uptime.json"

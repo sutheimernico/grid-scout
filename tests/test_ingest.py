@@ -131,9 +131,7 @@ class TestFaultIsolation:
         assert run.ok
         assert len(run.results) == len(self.NAMES)
 
-    def test_cli_degrades_partial_failure_to_a_warning(
-        self, fake_smard, tmp_path, monkeypatch
-    ):
+    def test_cli_degrades_partial_failure_to_a_warning(self, fake_smard, tmp_path, monkeypatch):
         self._stub_weeks(fake_smard)
         monkeypatch.setattr(
             "gridscout.cli.SmardClient",

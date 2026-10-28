@@ -25,8 +25,11 @@ VOLATILE_QUANTILE = 0.9
 
 def segment_errors(predictions: pd.DataFrame) -> dict:
     """predictions: the walk-forward frame (local_day, hour_local, target, pred_*)."""
-    missing = [c for c in ("local_day", "hour_local", "target", *MODEL_COLUMNS.values())
-               if c not in predictions]
+    missing = [
+        c
+        for c in ("local_day", "hour_local", "target", *MODEL_COLUMNS.values())
+        if c not in predictions
+    ]
     if missing:
         raise ValueError(f"predictions frame is missing columns: {missing}")
     frame = predictions.copy()

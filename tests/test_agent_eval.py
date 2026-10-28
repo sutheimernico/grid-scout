@@ -72,12 +72,8 @@ class FakeOllama:
 @pytest.fixture
 def agent(tmp_path):
     fake = FakeOllama()
-    agent = GridAgent(
-        tools=GridTools(data_dir=tmp_path, reports_dir=tmp_path), model="fake"
-    )
-    agent._http = httpx.Client(
-        base_url="http://fake", transport=httpx.MockTransport(fake.handler)
-    )
+    agent = GridAgent(tools=GridTools(data_dir=tmp_path, reports_dir=tmp_path), model="fake")
+    agent._http = httpx.Client(base_url="http://fake", transport=httpx.MockTransport(fake.handler))
     agent._fake = fake
     return agent
 
@@ -161,12 +157,16 @@ class TestHoldoutSet:
         for name in ["load", "gen_solar", "gen_wind_onshore", "gen_wind_offshore", "gen_gas"]:
             write_series(data, name, rng.uniform(100, 20_000, n), start_ms=1704063600000)
         tools = GridTools(data_dir=data, reports_dir=tmp_path)
-        models = {"lgbm_point": {"mae": 10.0, "rmse": 14.0}, "naive_yesterday": {"mae": 20.0},
-                  "seasonal_naive_7d": {"mae": 25.0}}
+        models = {
+            "lgbm_point": {"mae": 10.0, "rmse": 14.0},
+            "naive_yesterday": {"mae": 20.0},
+            "seasonal_naive_7d": {"mae": 25.0},
+        }
         skill = {"lgbm_vs_naive_pct": 50}
         tools.get_forecast_evaluation = lambda: {"models": models, "skill": skill}
         tools.get_battery_results = lambda: {
-            "capture_rate_model": 0.9, "model_edge_over_naive_eur": 1.0,
+            "capture_rate_model": 0.9,
+            "model_edge_over_naive_eur": 1.0,
             "revenue_eur": {"perfect": 3.0, "naive": 2.0, "model": 2.5},
         }
         return tools

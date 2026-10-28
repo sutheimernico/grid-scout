@@ -18,6 +18,7 @@ app = typer.Typer(no_args_is_help=True, add_completion=False)
 def main() -> None:
     """grid-scout pipeline commands."""
 
+
 SeriesOpt = Annotated[
     list[str] | None, typer.Option("--series", "-s", help="Subset of series names")
 ]

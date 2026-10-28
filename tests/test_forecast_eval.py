@@ -23,9 +23,7 @@ class TestMetrics:
         assert coverage(y, np.zeros(3), np.full(3, 6.0)) == pytest.approx(2 / 3)
 
     def test_summarize_by_hour(self):
-        result = summarize(
-            np.array([1.0, 1.0]), np.array([2.0, 4.0]), hours=np.array([0, 1])
-        )
+        result = summarize(np.array([1.0, 1.0]), np.array([2.0, 4.0]), hours=np.array([0, 1]))
         assert result["mae"] == pytest.approx(2.0)
         assert result["mae_by_hour"] == {0: 1.0, 1: 3.0}
 
