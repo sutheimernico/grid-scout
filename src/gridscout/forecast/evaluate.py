@@ -8,17 +8,24 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from gridscout.forecast.conformal import conformalize
 from gridscout.forecast.features import (
     FULL,
+    PRE_AUCTION,
     build_matrix,
     load_series_frame,
     local_days,
 )
 from gridscout.forecast.metrics import coverage, pinball, summarize
-from gridscout.forecast.models import LightGBMPrice, NaiveYesterday, SeasonalNaiveWeek
+from gridscout.forecast.models import (
+    LightGBMPrice,
+    NaiveYesterday,
+    RidgePerHour,
+    SeasonalNaiveWeek,
+)
 from gridscout.forecast.walkforward import make_folds, run_walkforward
 
-RAW_SERIES = FULL.raw_series
+RAW_SERIES = list(dict.fromkeys([*FULL.raw_series, *PRE_AUCTION.raw_series]))
 
 
 @dataclass
@@ -26,6 +33,7 @@ class EvalConfig:
     eval_days: int = 365
     step_days: int = 7
     seed: int = 42
+    target_coverage: float = 0.8
 
 
 def evaluate(data_dir: Path, config: EvalConfig | None = None) -> tuple[dict, pd.DataFrame]:
@@ -33,14 +41,19 @@ def evaluate(data_dir: Path, config: EvalConfig | None = None) -> tuple[dict, pd
     per hour of the eval period — the battery backtest consumes them."""
     config = config or EvalConfig()
     raw = load_series_frame(data_dir, RAW_SERIES)
-    matrix = build_matrix(raw)
+    matrix = build_matrix(raw, features=FULL)
     days = local_days(matrix)
     min_train = len(days) - config.eval_days
     if min_train < 365:
         raise ValueError(f"not enough history: {len(days)} days total, need eval + >=1y train")
     folds = make_folds(days, min_train_days=min_train, step_days=config.step_days)
 
-    point_models = [NaiveYesterday(), SeasonalNaiveWeek(), LightGBMPrice(seed=config.seed)]
+    point_models = [
+        NaiveYesterday(),
+        SeasonalNaiveWeek(),
+        RidgePerHour(),
+        LightGBMPrice(seed=config.seed),
+    ]
     results = {m.name: run_walkforward(matrix, m, folds) for m in point_models}
     q10 = run_walkforward(matrix, LightGBMPrice(quantile=0.1, seed=config.seed), folds)
     q90 = run_walkforward(matrix, LightGBMPrice(quantile=0.9, seed=config.seed), folds)
@@ -49,8 +62,21 @@ def evaluate(data_dir: Path, config: EvalConfig | None = None) -> tuple[dict, pd
     predictions["pred_point"] = results["lgbm_point"]["prediction"]
     predictions["pred_naive"] = results["naive_yesterday"]["prediction"]
     predictions["pred_snaive7"] = results["seasonal_naive_7d"]["prediction"]
+    predictions["pred_ridge"] = results["ridge_per_hour"]["prediction"]
     predictions["pred_q10"] = q10["prediction"]
     predictions["pred_q90"] = q90["prediction"]
+
+    # Same models on the strictly pre-auction inputs (nothing dated on the
+    # delivery day). Scored on exactly the hours the gate-closure run is scored on.
+    pre_matrix = build_matrix(raw, features=PRE_AUCTION)
+    pre_models = [LightGBMPrice(seed=config.seed), RidgePerHour()]
+    pre_results = {m.name: run_walkforward(pre_matrix, m, folds) for m in pre_models}
+    common = predictions.index.intersection(pre_results["lgbm_point"].index)
+    predictions["pred_point_pre_auction"] = pre_results["lgbm_point"]["prediction"]
+    predictions["pred_ridge_pre_auction"] = pre_results["ridge_per_hour"]["prediction"]
+    calibrated = conformalize(predictions, alpha=1 - config.target_coverage)
+    predictions["q_low_cal"] = calibrated["q_low_cal"]
+    predictions["q_high_cal"] = calibrated["q_high_cal"]
 
     report: dict = {
         "generated_utc": datetime.now(UTC).isoformat(timespec="seconds"),
@@ -77,12 +103,63 @@ def evaluate(data_dir: Path, config: EvalConfig | None = None) -> tuple[dict, pd
         "target_coverage": 0.8,
     }
 
+    scored = calibrated.dropna(subset=["q_low_cal"])
+    report["quantiles"]["conformal"] = {
+        "method": "walk-forward split conformal (CQR), calibrated on all earlier weeks",
+        "coverage_p10_p90": coverage(
+            scored["target"].to_numpy(),
+            scored["q_low_cal"].to_numpy(),
+            scored["q_high_cal"].to_numpy(),
+        ),
+        "raw_coverage_same_hours": coverage(
+            scored["target"].to_numpy(),
+            scored["pred_q10"].to_numpy(),
+            scored["pred_q90"].to_numpy(),
+        ),
+        "mean_width_raw": float((scored["pred_q90"] - scored["pred_q10"]).mean()),
+        "mean_width_calibrated": float((scored["q_high_cal"] - scored["q_low_cal"]).mean()),
+        "n_hours": int(len(scored)),
+    }
+
+    on_common = {
+        "naive_yesterday": results["naive_yesterday"].loc[common],
+        "seasonal_naive_7d": results["seasonal_naive_7d"].loc[common],
+        "ridge_gate_closure": results["ridge_per_hour"].loc[common],
+        "lgbm_gate_closure": results["lgbm_point"].loc[common],
+        "ridge_pre_auction": pre_results["ridge_per_hour"].loc[common],
+        "lgbm_pre_auction": pre_results["lgbm_point"].loc[common],
+    }
+    report["pre_auction"] = {
+        "description": (
+            "Same walk-forward, but with the strictly pre-auction feature set: no input is "
+            "dated on the delivery day (SMARD publishes its generation forecast for day D "
+            "only 17-21 UTC on D-1, after the 12:00 auction). *_gate_closure models use the "
+            "TSO forecast for day D, as a trader with TSO feeds would have it at 12:00."
+        ),
+        "n": int(len(common)),
+        "models": {
+            name: summarize(
+                frame["target"].to_numpy(),
+                frame["prediction"].to_numpy(),
+                frame["hour_local"].to_numpy(),
+            )
+            for name, frame in on_common.items()
+        },
+    }
+    pre = report["pre_auction"]["models"]
+    report["pre_auction"]["skill_vs_naive_pct"] = round(
+        100 * (1 - pre["lgbm_pre_auction"]["mae"] / pre["naive_yesterday"]["mae"]), 1
+    )
+
     lgbm = report["models"]["lgbm_point"]["mae"]
     naive = report["models"]["naive_yesterday"]["mae"]
     snaive = report["models"]["seasonal_naive_7d"]["mae"]
     report["skill"] = {
         "lgbm_vs_naive_pct": round(100 * (1 - lgbm / naive), 1),
         "lgbm_vs_seasonal_naive_pct": round(100 * (1 - lgbm / snaive), 1),
+        "lgbm_vs_ridge_pct": round(
+            100 * (1 - lgbm / report["models"]["ridge_per_hour"]["mae"]), 1
+        ),
     }
     report["finding"] = _verdict(report)
     return report, predictions
@@ -108,10 +185,16 @@ def _verdict(report: dict) -> str:
             f"LightGBM beats the naive baseline by {skill:+.1f}% "
             f"(MAE {mae:.2f} EUR/MWh)."
         )
+    pre = report["pre_auction"]["models"]["lgbm_pre_auction"]["mae"]
+    ridge = report["models"]["ridge_per_hour"]["mae"]
+    cal = report["quantiles"]["conformal"]["coverage_p10_p90"]
     return head + (
-        f" The p10-p90 band covers {cov:.0%} of outcomes (target 80%)."
-        " Metrics are walk-forward, leakage-guarded, over the full eval period"
-        " including nights and weekends."
+        f" A per-hour ridge (LEAR-style) baseline scores MAE {ridge:.2f}."
+        " Assumes the TSOs' day-ahead generation forecast is known at gate closure;"
+        f" on strictly pre-auction SMARD inputs the model scores MAE {pre:.2f}."
+        f" The raw p10-p90 band covers {cov:.0%} of outcomes (target 80%);"
+        f" conformal calibration brings it to {cal:.0%}."
+        " Metrics are walk-forward over the full eval period including nights and weekends."
     )
 
 

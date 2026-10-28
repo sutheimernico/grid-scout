@@ -77,3 +77,49 @@ class LightGBMPrice:
         if self._booster is None:
             raise RuntimeError("model not fitted")
         return np.asarray(self._booster.predict(X))
+
+
+class RidgePerHour:
+    """LEAR-style linear baseline: one ridge regression per local hour.
+
+    The standard strong benchmark in day-ahead price forecasting (Lago et al.):
+    each hour of the day gets its own linear model on the same inputs LightGBM
+    sees, so any gap to it is the value of non-linearity, not of information.
+    Closed-form ridge on standardised features; `hour_local` selects the model
+    and `month` is left out (a linear month index is meaningless).
+    """
+
+    name = "ridge_per_hour"
+
+    def __init__(self, alpha: float = 10.0):
+        self.alpha = alpha
+        self._coef: dict[int, tuple[list[str], np.ndarray, np.ndarray, np.ndarray, float]] = {}
+
+    @staticmethod
+    def _inputs(X: pd.DataFrame) -> list[str]:
+        return [c for c in X.columns if c not in ("hour_local", "month")]
+
+    def fit(self, X: pd.DataFrame, y: pd.Series) -> None:
+        cols = self._inputs(X)
+        self._coef = {}
+        for hour, rows in X.groupby("hour_local").groups.items():
+            A = X.loc[rows, cols].to_numpy(dtype=float)
+            t = y.loc[rows].to_numpy(dtype=float)
+            mean, std = A.mean(axis=0), A.std(axis=0)
+            std[std == 0] = 1.0
+            Z = (A - mean) / std
+            t_mean = t.mean()
+            beta = np.linalg.solve(Z.T @ Z + self.alpha * np.eye(len(cols)), Z.T @ (t - t_mean))
+            self._coef[int(hour)] = (cols, mean, std, beta, t_mean)
+
+    def predict(self, X: pd.DataFrame) -> np.ndarray:
+        if not self._coef:
+            raise RuntimeError("model not fitted")
+        out = np.empty(len(X))
+        hours = X["hour_local"].to_numpy()
+        for hour, (cols, mean, std, beta, t_mean) in self._coef.items():
+            mask = hours == hour
+            if mask.any():
+                Z = (X.loc[mask, cols].to_numpy(dtype=float) - mean) / std
+                out[mask] = Z @ beta + t_mean
+        return out
