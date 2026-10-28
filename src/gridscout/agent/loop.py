@@ -109,7 +109,12 @@ class GridAgent:
         result = AgentResult(question=question, answer="")
         for round_no in range(1, MAX_TOOL_ROUNDS + 1):
             result.rounds = round_no
-            response = self._chat(messages)
+            try:
+                response = self._chat(messages)
+            except httpx.HTTPError as exc:
+                # A slow or dead Ollama must cost one question, not a whole eval run.
+                result.error = f"{type(exc).__name__}: {exc}"
+                return result
             message = response["message"]
             calls = message.get("tool_calls") or []
             if not calls:

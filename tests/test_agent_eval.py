@@ -96,6 +96,17 @@ def test_agent_rejects_unknown_tool(agent):
     assert "unknown tool" in payload["error"]
 
 
+def test_a_timeout_costs_one_question_not_the_run(tmp_path):
+    def slow(request: httpx.Request) -> httpx.Response:
+        raise httpx.ReadTimeout("timed out", request=request)
+
+    agent = GridAgent(tools=GridTools(data_dir=tmp_path, reports_dir=tmp_path), model="fake")
+    agent._http = httpx.Client(base_url="http://fake", transport=httpx.MockTransport(slow))
+    result = agent.ask("anything")
+    assert result.answer == ""
+    assert "ReadTimeout" in result.error
+
+
 def test_agent_survives_bad_arguments(agent):
     payload = agent._dispatch("get_price_day", {"nonsense": True})
     assert "bad arguments" in payload["error"]

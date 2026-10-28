@@ -162,6 +162,7 @@ def agent_eval(
     reports_dir: Annotated[Path, typer.Option(help="Report directory")] = Path("reports"),
     model: Annotated[str, typer.Option(help="Ollama model")] = "qwen2.5:7b",
     holdout: Annotated[bool, typer.Option(help="Also run the untuned holdout set")] = True,
+    timeout: Annotated[float, typer.Option(help="Seconds per Ollama request")] = 180.0,
 ) -> None:
     """Run the agent eval sets against a local Ollama model (requires ollama serve)."""
     from gridscout.agent.evaluation import build_holdout_set, run_eval
@@ -170,7 +171,7 @@ def agent_eval(
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     tools = GridTools(data_dir=data_dir, reports_dir=reports_dir)
-    agent = GridAgent(tools=tools, model=model)
+    agent = GridAgent(tools=tools, model=model, timeout=timeout)
     runs = [("development set", run_eval(agent, tools, reports_dir))]
     if holdout:
         runs.append(
