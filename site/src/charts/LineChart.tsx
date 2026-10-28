@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from "react";
 import { bandPath, extent, linePath, linearScale, ticks } from "./scale";
+import { useChartWidth } from "../lib/useChartWidth";
 
 export interface LineSeries {
   key: string;
@@ -27,7 +28,6 @@ interface Props {
 }
 
 const MARGIN = { top: 12, right: 16, bottom: 26, left: 52 };
-const WIDTH = 960;
 
 /** Multi-series line chart: hairline grid, zero baseline, gap-aware lines,
  *  optional quantile band, crosshair + tooltip on hover. */
@@ -41,6 +41,7 @@ export function LineChart({
   xTickEvery,
 }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
+  const WIDTH = useChartWidth(wrapRef);
   const [hover, setHover] = useState<number | null>(null);
 
   const n = xLabels.length;
@@ -58,7 +59,7 @@ export function LineChart({
     return { y, yTicks: ticks([lo, hi + pad], 5), x };
   }, [series, band, n, innerH, innerW]);
 
-  const step = xTickEvery ?? Math.max(1, Math.round(n / 6));
+  const step = xTickEvery ?? Math.max(1, Math.round(n / Math.max(2, Math.min(6, Math.floor(WIDTH / 130)))));
   const xTickIdx = Array.from({ length: n }, (_, i) => i).filter((i) => i % step === 0);
 
   function onMove(e: React.MouseEvent<SVGSVGElement>) {

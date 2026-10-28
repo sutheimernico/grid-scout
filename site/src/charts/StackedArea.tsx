@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from "react";
 import { linearScale, ticks } from "./scale";
+import { useChartWidth } from "../lib/useChartWidth";
 
 export interface StackSeries {
   key: string;
@@ -17,12 +18,12 @@ interface Props {
 }
 
 const MARGIN = { top: 12, right: 16, bottom: 26, left: 52 };
-const WIDTH = 960;
 
 /** Stacked area (composition over time). Hairline surface-colored separators
  *  between bands stand in for the 2px spacer rule of stacked bars. */
 export function StackedArea({ series, xLabels, height = 280, unit, formatValue = (v) => v.toFixed(0) }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
+  const WIDTH = useChartWidth(wrapRef);
   const [hover, setHover] = useState<number | null>(null);
   const n = xLabels.length;
   const innerW = WIDTH - MARGIN.left - MARGIN.right;
@@ -58,7 +59,7 @@ export function StackedArea({ series, xLabels, height = 280, unit, formatValue =
     setHover(i >= 0 && i < n ? i : null);
   }
 
-  const step = Math.max(1, Math.round(n / 6));
+  const step = Math.max(1, Math.round(n / Math.max(2, Math.min(6, Math.floor(WIDTH / 130)))));
   const zeros = new Array(n).fill(0);
   const tooltipLeft =
     hover != null && wrapRef.current ? (x(hover) / WIDTH) * wrapRef.current.clientWidth : 0;

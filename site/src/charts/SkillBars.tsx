@@ -6,6 +6,8 @@
  */
 
 import { linearScale, ticks } from "./scale";
+import { useChartWidth } from "../lib/useChartWidth";
+import { useRef } from "react";
 
 export interface Segment {
   segment: string;
@@ -24,9 +26,10 @@ interface Props {
 }
 
 const MARGIN = { top: 10, right: 12, bottom: 24, left: 42 };
-const WIDTH = 960;
 
 export function SkillBars({ segments, label, height = 170, labelEvery = 1 }: Props) {
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const WIDTH = useChartWidth(wrapRef);
   const innerW = WIDTH - MARGIN.left - MARGIN.right;
   const innerH = height - MARGIN.top - MARGIN.bottom;
   const values = segments.map((s) => s.skill_vs_naive_pct ?? 0);
@@ -37,7 +40,7 @@ export function SkillBars({ segments, label, height = 170, labelEvery = 1 }: Pro
   const barW = Math.max(4, slot * 0.62);
 
   return (
-    <div className="chart-wrap">
+    <div className="chart-wrap" ref={wrapRef}>
       <svg viewBox={`0 0 ${WIDTH} ${height}`} width="100%" role="img" aria-label={label}>
         {ticks([lo, hi], 4).map((t) => (
           <g key={t}>
@@ -71,7 +74,7 @@ export function SkillBars({ segments, label, height = 170, labelEvery = 1 }: Pro
                   {`${s.segment}: model ${s.mae_model.toFixed(2)} vs naive ${s.mae_naive.toFixed(2)} EUR/MWh over ${s.n} hours`}
                 </title>
               </rect>
-              {i % labelEvery === 0 && (
+              {i % Math.max(labelEvery, Math.ceil(36 / slot)) === 0 && (
                 <text x={x + barW / 2} y={height - 8} textAnchor="middle">
                   {s.segment}
                 </text>
