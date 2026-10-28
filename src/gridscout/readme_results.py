@@ -13,6 +13,11 @@ START = "<!-- results:start -->"
 END = "<!-- results:end -->"
 
 
+def _run_date(report: dict) -> str:
+    stamp = report.get("generated_utc")
+    return f", run {stamp[:10]}" if stamp else ""
+
+
 def _load(path: Path) -> dict | None:
     return json.loads(path.read_text()) if path.exists() else None
 
@@ -58,7 +63,7 @@ def render_results(reports_dir: Path) -> str:
         f"{battery['model_edge_over_naive_eur']:+,.0f} €/yr (gross, no fees or degradation).",
     ]
     if sensitivity:
-        edges = [c["edge_over_naive_eur_per_mw_year"] for c in sensitivity.get("cells", [])]
+        edges = [c["model_edge_over_naive_eur_per_mw_year"] for c in sensitivity.get("cells", [])]
         if edges:
             lines.append(
                 f"- Across the efficiency × duration sweep the edge over naive stays between "
@@ -67,12 +72,12 @@ def render_results(reports_dir: Path) -> str:
     if agent:
         lines.append(
             f"- **Local agent, development set** (tuned on): {agent['passed']}/{agent['n']} "
-            f"({agent['pass_rate']:.0%})."
+            f"({agent['pass_rate']:.0%}{_run_date(agent)})."
         )
     if holdout:
         lines.append(
             f"- **Local agent, untuned holdout** (written after tuning): "
-            f"{holdout['passed']}/{holdout['n']} ({holdout['pass_rate']:.0%})."
+            f"{holdout['passed']}/{holdout['n']} ({holdout['pass_rate']:.0%}{_run_date(holdout)})."
         )
     return "\n".join(lines)
 

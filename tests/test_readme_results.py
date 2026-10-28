@@ -36,6 +36,16 @@ def reports(tmp_path):
             }
         )
     )
+    (tmp_path / "battery_sensitivity.json").write_text(
+        json.dumps(
+            {
+                "cells": [
+                    {"model_edge_over_naive_eur_per_mw_year": 4400.0},
+                    {"model_edge_over_naive_eur_per_mw_year": 8600.0},
+                ]
+            }
+        )
+    )
     return tmp_path
 
 
@@ -44,6 +54,7 @@ def test_table_carries_every_baseline_the_date_and_both_coverages(reports):
     for expected in ("2026-10-28", "30.00", "38.00", "22.50", "19.50", "25.00", "62%", "75%"):
         assert expected in text
     assert "80,000" in text
+    assert "between 4,400 and 8,600" in text
 
 
 def test_agent_lines_appear_only_when_reports_exist(reports):
