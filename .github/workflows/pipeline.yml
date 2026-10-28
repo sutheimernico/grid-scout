@@ -79,6 +79,7 @@ jobs:
           uv run gridscout forecast-eval
           uv run gridscout battery-backtest
           uv run gridscout battery-sensitivity
+          uv run gridscout update-readme
 
       # Forward test. The command skips itself (exit 0) when SMARD has not
       # published enough yet — a data fact, not a pipeline failure.
@@ -96,7 +97,7 @@ jobs:
         run: |
           git config user.name "grid-scout pipeline"
           git config user.email "actions@users.noreply.github.com"
-          git add data reports site/public/data
+          git add data reports site/public/data README.md
           git diff --cached --quiet || git commit -m "chore(pipeline): refresh data artifacts [skip ci]"
           git push origin HEAD:main
 
