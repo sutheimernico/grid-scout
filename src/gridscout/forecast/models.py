@@ -46,6 +46,11 @@ class LightGBMPrice:
     learning_rate: float = 0.05
     num_leaves: int = 63
     seed: int = 42
+    # Pinned, not left to LightGBM's "all cores" default: unbounded OpenMP threads
+    # oversubscribe small CI/test machines (a test run hung for >10 min) and make
+    # run time depend on the host. Fixed count + deterministic=True keeps results
+    # reproducible.
+    num_threads: int = 4
     name: str = field(init=False)
     _booster: lgb.Booster | None = field(init=False, default=None, repr=False)
 
@@ -58,6 +63,7 @@ class LightGBMPrice:
             "learning_rate": self.learning_rate,
             "num_leaves": self.num_leaves,
             "seed": self.seed,
+            "num_threads": self.num_threads,
             "deterministic": True,
             "force_row_wise": True,
             "verbosity": -1,
