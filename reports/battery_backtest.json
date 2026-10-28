@@ -1,4 +1,5 @@
 {
+  "generated_utc": "2026-10-28T13:47:06+00:00",
   "battery": {
     "power_mw": 1.0,
     "capacity_mwh": 2.0,
@@ -6,17 +7,17 @@
   },
   "n_days": 363,
   "revenue_eur": {
-    "perfect": 85563.62,
-    "model": 79957.93,
-    "naive": 76297.77
+    "perfect": 85860.97,
+    "model": 80831.62,
+    "naive": 76493.57
   },
   "revenue_eur_per_mw_year": {
-    "perfect": 86035.04,
-    "model": 80398.47,
-    "naive": 76718.15
+    "perfect": 86334.03,
+    "model": 81276.97,
+    "naive": 76915.02
   },
-  "capture_rate_model": 0.9345,
-  "capture_rate_naive": 0.8917,
-  "model_edge_over_naive_eur": 3660.16,
+  "capture_rate_model": 0.9414,
+  "capture_rate_naive": 0.8909,
+  "model_edge_over_naive_eur": 4338.04,
   "skipped_days": 2
 }

@@ -1,0 +1,127 @@
+{
+  "generated_utc": "2026-10-28T13:47:10+00:00",
+  "power_mw": 1.0,
+  "cycles_per_day": 1.0,
+  "n_days": 363,
+  "grid": {
+    "round_trip_efficiency": [
+      0.85,
+      0.9,
+      0.95
+    ],
+    "duration_h": [
+      2,
+      4
+    ]
+  },
+  "cells": [
+    {
+      "round_trip_efficiency": 0.85,
+      "duration_h": 2,
+      "capacity_mwh": 2.0,
+      "revenue_eur": {
+        "perfect": 84934.94,
+        "model": 79918.91,
+        "naive": 75585.96
+      },
+      "revenue_eur_per_mw_year": {
+        "perfect": 85402.9,
+        "model": 80359.24,
+        "naive": 76002.41
+      },
+      "capture_rate_model": 0.9409,
+      "capture_rate_naive": 0.8899,
+      "model_edge_over_naive_eur_per_mw_year": 4356.83
+    },
+    {
+      "round_trip_efficiency": 0.85,
+      "duration_h": 4,
+      "capacity_mwh": 4.0,
+      "revenue_eur": {
+        "perfect": 145966.85,
+        "model": 139497.98,
+        "naive": 130970.42
+      },
+      "revenue_eur_per_mw_year": {
+        "perfect": 146771.08,
+        "model": 140266.57,
+        "naive": 131692.02
+      },
+      "capture_rate_model": 0.9557,
+      "capture_rate_naive": 0.8973,
+      "model_edge_over_naive_eur_per_mw_year": 8574.55
+    },
+    {
+      "round_trip_efficiency": 0.9,
+      "duration_h": 2,
+      "capacity_mwh": 2.0,
+      "revenue_eur": {
+        "perfect": 89487.71,
+        "model": 84404.97,
+        "naive": 79968.26
+      },
+      "revenue_eur_per_mw_year": {
+        "perfect": 89980.75,
+        "model": 84870.01,
+        "naive": 80408.86
+      },
+      "capture_rate_model": 0.9432,
+      "capture_rate_naive": 0.8936,
+      "model_edge_over_naive_eur_per_mw_year": 4461.15
+    },
+    {
+      "round_trip_efficiency": 0.9,
+      "duration_h": 4,
+      "capacity_mwh": 4.0,
+      "revenue_eur": {
+        "perfect": 155205.04,
+        "model": 148623.69,
+        "naive": 140195.44
+      },
+      "revenue_eur_per_mw_year": {
+        "perfect": 156060.16,
+        "model": 149442.56,
+        "naive": 140967.87
+      },
+      "capture_rate_model": 0.9576,
+      "capture_rate_naive": 0.9033,
+      "model_edge_over_naive_eur_per_mw_year": 8474.69
+    },
+    {
+      "round_trip_efficiency": 0.95,
+      "duration_h": 2,
+      "capacity_mwh": 2.0,
+      "revenue_eur": {
+        "perfect": 93858.27,
+        "model": 88707.6,
+        "naive": 84272.4
+      },
+      "revenue_eur_per_mw_year": {
+        "perfect": 94375.4,
+        "model": 89196.34,
+        "naive": 84736.71
+      },
+      "capture_rate_model": 0.9451,
+      "capture_rate_naive": 0.8979,
+      "model_edge_over_naive_eur_per_mw_year": 4459.63
+    },
+    {
+      "round_trip_efficiency": 0.95,
+      "duration_h": 4,
+      "capacity_mwh": 4.0,
+      "revenue_eur": {
+        "perfect": 164045.33,
+        "model": 157381.82,
+        "naive": 148972.7
+      },
+      "revenue_eur_per_mw_year": {
+        "perfect": 164949.16,
+        "model": 158248.94,
+        "naive": 149793.49
+      },
+      "capture_rate_model": 0.9594,
+      "capture_rate_naive": 0.9081,
+      "model_edge_over_naive_eur_per_mw_year": 8455.45
+    }
+  ]
+}
