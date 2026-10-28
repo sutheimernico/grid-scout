@@ -144,6 +144,18 @@ def _predictions_path(reports_dir: Path) -> Path:
     return path
 
 
+@app.command("update-readme")
+def update_readme_cmd(
+    reports_dir: Annotated[Path, typer.Option(help="Report directory")] = Path("reports"),
+    readme: Annotated[Path, typer.Option(help="README to update")] = Path("README.md"),
+) -> None:
+    """Regenerate the README results block from the report artifacts."""
+    from gridscout.readme_results import update_readme
+
+    changed = update_readme(readme, reports_dir)
+    typer.echo("README results updated" if changed else "README results already current")
+
+
 @app.command("agent-eval")
 def agent_eval(
     data_dir: DataDirOpt = Path("data"),
