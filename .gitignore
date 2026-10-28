@@ -19,3 +19,16 @@ site/dist/
 
 # OS
 .DS_Store
+
+# Process files: kept on disk for the author's tooling, not part of the public tree
+LOOP.md
+AUTOPILOT_LOG.md
+PLAN.md
+PROJECT.md
+AGENTS.md
+CLAUDE.md
+.vscode/
+.claude/
+
+# TypeScript incremental build cache
+*.tsbuildinfo
