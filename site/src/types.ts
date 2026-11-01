@@ -66,7 +66,7 @@ export interface ForecastData {
       pinball_q90: number;
       coverage_p10_p90: number;
       target_coverage: number;
-      conformal?: { coverage_p10_p90: number; mean_width_calibrated: number };
+      conformal?: { coverage_p10_p90: number; mean_width_calibrated: number; mean_width_raw?: number };
     };
     /** same walk-forward on inputs published before the auction (absent in old exports) */
     pre_auction?: {

@@ -17,7 +17,7 @@ interface Props {
   formatValue?: (v: number) => string;
 }
 
-const MARGIN = { top: 12, right: 16, bottom: 26, left: 52 };
+const MARGIN = { top: 12, right: 14, bottom: 28, left: 46 };
 
 /** Stacked area (composition over time). Hairline surface-colored separators
  *  between bands stand in for the 2px spacer rule of stacked bars. */
@@ -81,23 +81,25 @@ export function StackedArea({ series, xLabels, height = 280, unit, formatValue =
               x2={WIDTH - MARGIN.right}
               y1={y(t)}
               y2={y(t)}
-              stroke={t === 0 ? "var(--baseline)" : "var(--grid-hairline)"}
+              stroke={t === 0 ? "var(--baseline)" : "var(--c-grid)"}
               strokeWidth={1}
             />
-            <text x={MARGIN.left - 8} y={y(t) + 3.5} textAnchor="end">
+            <text x={MARGIN.left - 8} y={y(t) + 4} textAnchor="end">
               {formatValue(t)}
             </text>
           </g>
         ))}
+        <g className="wipe">
         {series.map((s, si) => (
           <path
             key={s.key}
             d={areaPath(stacked[si], si === 0 ? zeros : stacked[si - 1])}
             fill={s.color}
-            stroke="var(--surface)"
-            strokeWidth={1.5}
+            stroke="var(--paper)"
+            strokeWidth={1}
           />
         ))}
+        </g>
         {Array.from({ length: n }, (_, i) => i)
           .filter((i) => i % step === 0)
           .map((i) => (
@@ -113,7 +115,6 @@ export function StackedArea({ series, xLabels, height = 280, unit, formatValue =
             y2={MARGIN.top + innerH}
             stroke="var(--ink)"
             strokeWidth={1}
-            strokeDasharray="3 3"
           />
         )}
       </svg>

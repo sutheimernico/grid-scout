@@ -5,10 +5,10 @@
  *  panel is that a gap is as readable as a streak.
  */
 
-const CELL = 11;
-const GAP = 3;
-const TOP = 16;
-const LEFT = 26;
+const CELL = 24;
+const GAP = 5;
+const TOP = 20;
+const LEFT = 38;
 const WEEKDAY_LABELS = ["Mon", "", "Wed", "", "Fri", "", ""];
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -49,7 +49,7 @@ export function layout(days: HeatmapDay[]): { day: HeatmapDay; col: number; row:
   });
 }
 
-export function Heatmap({ days, expectedPerDay, color = "var(--good)", emptyColor = "var(--grid-hairline)", label }: Props) {
+export function Heatmap({ days, expectedPerDay, color = "var(--volt)", emptyColor = "var(--grid-hairline)", label }: Props) {
   const cells = layout(days);
   const columns = cells.length ? cells[cells.length - 1].col + 1 : 0;
   const width = LEFT + columns * (CELL + GAP);
@@ -66,16 +66,16 @@ export function Heatmap({ days, expectedPerDay, color = "var(--good)", emptyColo
   }
 
   return (
-    <div className="chart-wrap">
-      <svg className="heatmap" viewBox={`0 0 ${width} ${height}`} width={width} height={height} role="img" aria-label={label}>
+    <div className="heat-scroll">
+      <svg className="heatmap" viewBox={`0 0 ${width} ${height}`} width="100%" style={{ maxWidth: width }} role="img" aria-label={label}>
         {monthTicks.map((t) => (
-          <text key={`${t.name}-${t.col}`} x={LEFT + t.col * (CELL + GAP)} y={10} textAnchor="start">
+          <text key={`${t.name}-${t.col}`} x={LEFT + t.col * (CELL + GAP)} y={11} textAnchor="start">
             {t.name}
           </text>
         ))}
         {WEEKDAY_LABELS.map((name, row) =>
           name ? (
-            <text key={name} x={LEFT - 6} y={TOP + row * (CELL + GAP) + CELL - 1} textAnchor="end">
+            <text key={name} x={LEFT - 6} y={TOP + row * (CELL + GAP) + CELL - 7} textAnchor="end">
               {name}
             </text>
           ) : null,
@@ -89,7 +89,7 @@ export function Heatmap({ days, expectedPerDay, color = "var(--good)", emptyColo
               y={TOP + row * (CELL + GAP)}
               width={CELL}
               height={CELL}
-              rx={2}
+              rx={2.5}
               fill={alpha === 0 ? emptyColor : color}
               opacity={alpha === 0 ? 1 : alpha}
             >
