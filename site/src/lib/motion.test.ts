@@ -1,0 +1,25 @@
+import { describe, expect, it } from "vitest";
+import { countAt, easeOutCubic } from "./motion";
+
+describe("easeOutCubic", () => {
+  it("runs from 0 to 1, fast first", () => {
+    expect(easeOutCubic(0)).toBe(0);
+    expect(easeOutCubic(1)).toBe(1);
+    expect(easeOutCubic(0.5)).toBeGreaterThan(0.5);
+  });
+  it("clamps outside the range", () => {
+    expect(easeOutCubic(-1)).toBe(0);
+    expect(easeOutCubic(3)).toBe(1);
+  });
+});
+
+describe("countAt", () => {
+  it("lands exactly on the target", () => {
+    expect(countAt(19.65, 900, 900)).toBeCloseTo(19.65, 10);
+    expect(countAt(19.65, 5000, 900)).toBeCloseTo(19.65, 10);
+  });
+  it("starts at zero and handles a zero duration", () => {
+    expect(countAt(10, 0, 900)).toBe(0);
+    expect(countAt(10, 0, 0)).toBe(10);
+  });
+});
