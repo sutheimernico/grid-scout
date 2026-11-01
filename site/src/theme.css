@@ -124,7 +124,7 @@ h3 {
   text-wrap: balance;
 }
 h1 {
-  font-size: clamp(32px, 4.3vw, 58px);
+  font-size: clamp(30px, 3.9vw, 52px);
   font-weight: 800;
   font-stretch: 118%;
   line-height: 1.02;

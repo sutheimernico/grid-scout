@@ -219,7 +219,6 @@ function LatestForecast({ latest }: { latest: ForwardLedgerData["latest"] }) {
         endLabels
         xLabels={latest.hours_local.map((h) => `${String(h).padStart(2, "0")}:00`)}
         unit="€/MWh"
-        xTickEvery={3}
       />
     </Reveal>
   );

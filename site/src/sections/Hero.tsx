@@ -3,6 +3,7 @@ import { HeroChart } from "../charts/HeroChart";
 import { LineChart } from "../charts/LineChart";
 import { fmtCalendarDate, fmtDateTime, fmtHourLabel, fmtNum } from "../lib/format";
 import { hasRecordedForecasts, lastScoredDay, liveTomorrow } from "../lib/live";
+import { Reveal } from "../ui";
 import type { Loadable } from "../lib/useData";
 import { pickHeroWindow } from "../lib/hero";
 import type { ForecastData, ForwardLedgerData, HealthData } from "../types";
@@ -116,7 +117,7 @@ export function Hero({
 function Tomorrow({ latest, ledger }: { latest: NonNullable<ForwardLedgerData["latest"]>; ledger: ForwardLedgerData }) {
   const last = lastScoredDay(ledger);
   return (
-    <div className="tomorrow">
+    <Reveal className="tomorrow">
       <p className="subhead" style={{ marginTop: 0 }}>
         Delivery day {fmtCalendarDate(latest.target_date)}: forecast recorded {fmtDateTime(latest.generated_at_utc)}.
         The day-ahead auction clears at 12:00 and no cleared price exists yet.
@@ -131,7 +132,6 @@ function Tomorrow({ latest, ledger }: { latest: NonNullable<ForwardLedgerData["l
           ]}
           xLabels={latest.hours_local.map(fmtHourLabel)}
           unit="€/MWh"
-          xTickEvery={3}
         />
       </div>
       {last && last.maeModel != null && last.maeNaive != null && (
@@ -140,6 +140,6 @@ function Tomorrow({ latest, ledger }: { latest: NonNullable<ForwardLedgerData["l
           {fmtNum(last.maeNaive, 1)} for the naive forecast.
         </p>
       )}
-    </div>
+    </Reveal>
   );
 }

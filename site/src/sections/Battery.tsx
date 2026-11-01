@@ -18,10 +18,11 @@ export function Battery({ data }: { data: BatteryData }) {
           <Reveal>
             <p className="small" style={{ marginBottom: 6 }}>
               What the forecast adds to a {s.battery.power_mw} MW / {s.battery.capacity_mwh} MWh battery
+              {split.edgePct != null ? `: ${fmtSigned(split.edgePct, 1)}% over a naive forecast` : ""}
             </p>
             <div className="big-figure">
               {fmtSigned(split.edge)}
-              <small>€ a year{split.edgePct != null ? `, ${fmtSigned(split.edgePct, 1)}%` : ""}</small>
+              <small>€ a year</small>
             </div>
             <h2 style={{ marginTop: 18, maxWidth: "26ch" }}>
               Most of the revenue is the battery, not the forecast
