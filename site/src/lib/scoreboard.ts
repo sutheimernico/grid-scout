@@ -39,7 +39,8 @@ export function buildScoreboard(evalData: ForecastData["eval"]): ScoreRow[] {
       kind: "model",
       mae: pre.mae,
       rmse: pre.rmse,
-      skillVsNaive: skill(pre.mae),
+      // measured against the naive error of the same pre-auction run (its sample is slightly different)
+      skillVsNaive: evalData.pre_auction?.skill_vs_naive_pct ?? skill(pre.mae),
     });
   const main = evalData.models.lgbm_point;
   if (main)

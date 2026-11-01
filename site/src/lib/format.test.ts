@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fmtCalendarDate, fmtDateTime, fmtHourLabel, fmtMonthYear, fmtNum, fmtPct, fmtSigned, localParts } from "./format";
+import { fmtPrice, unitSpelling, fmtCalendarDate, fmtDateTime, fmtHourLabel, fmtMonthYear, fmtNum, fmtPct, fmtSigned, localParts } from "./format";
 
 describe("fmtNum", () => {
   it("groups thousands and fixes decimals", () => {
@@ -55,5 +55,19 @@ describe("dates and hours", () => {
   it("shows date-times on the Berlin clock", () => {
     expect(fmtDateTime("2026-10-28T13:50:00+00:00")).toBe("28 Oct, 14:50");
     expect(fmtDateTime("2026-07-01T08:05:00+00:00")).toBe("1 Jul, 10:05");
+  });
+});
+
+describe("fmtPrice", () => {
+  it("has no plus sign and a true minus", () => {
+    expect(fmtPrice(226.94)).toBe("226.9");
+    expect(fmtPrice(-4)).toBe("\u22124.0");
+    expect(fmtPrice(-0.02)).toBe("0.0");
+  });
+});
+
+describe("unitSpelling", () => {
+  it("uses one unit spelling", () => {
+    expect(unitSpelling("low of -4.99 EUR/MWh and 100 EUR/MW/yr")).toBe("low of -4.99 €/MWh and 100 €/MW/yr");
   });
 });

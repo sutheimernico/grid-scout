@@ -86,3 +86,14 @@ export function fmtMonthYear(iso: string): string {
   const [y, m] = iso.slice(0, 7).split("-").map(Number);
   return `${MONTHS[m - 1]} ${y}`;
 }
+
+/** A price or other quantity that can be negative, with a real minus sign and no plus. */
+export function fmtPrice(v: number, digits = 1): string {
+  const body = fmtNum(Math.abs(v), digits);
+  return v < 0 && Number(body.replace(/,/g, "")) !== 0 ? `\u2212${body}` : body;
+}
+
+/** The pipeline writes "EUR/MWh" in generated sentences; the page uses one spelling. */
+export function unitSpelling(text: string): string {
+  return text.replace(/EUR\/MWh/g, "€/MWh").replace(/EUR\/MW\/yr/g, "€/MW/yr");
+}

@@ -43,6 +43,8 @@ describe("buildScoreboard", () => {
     const rows = buildScoreboard(withPre);
     expect(rows.map((r) => r.key)).toContain("lgbm_pre_auction");
     expect(rows.find((r) => r.key === "lgbm_pre_auction")!.kind).toBe("model");
+    // its skill is the pipeline's own figure, not recomputed against the full run's naive error
+    expect(rows.find((r) => r.key === "lgbm_pre_auction")!.skillVsNaive).toBe(17);
   });
 
   it("drops rows the export does not carry instead of inventing them", () => {
