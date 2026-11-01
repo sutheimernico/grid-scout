@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { bandPath, linePath, linearScale, ticks } from "./scale";
 import { useChartWidth } from "../lib/useChartWidth";
-import { fmtHourLabel, fmtNum, fmtSigned, localParts } from "../lib/format";
+import { fmtHourLabel, fmtNum, fmtPrice, fmtSigned, localParts } from "../lib/format";
 import type { HeroWindow } from "../lib/hero";
 import { useInView } from "../lib/motion";
 
@@ -10,7 +10,7 @@ const MARGIN = { top: 30, right: 14, bottom: 28, left: 46 };
 /** The hero: forecast, band and cleared prices for the last complete delivery
  *  days of the backtest. Hover or arrow keys move a crosshair; the values appear
  *  in the readout row above the plot so nothing floats over the curves. */
-export function HeroChart({ window: w, height = 380 }: { window: HeroWindow; height?: number }) {
+export function HeroChart({ window: w, height = 380, yearMae }: { window: HeroWindow; height?: number; yearMae?: number }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const WIDTH = useChartWidth(wrapRef, 1240);
   const [hover, setHover] = useState<number | null>(null);
@@ -68,7 +68,7 @@ export function HeroChart({ window: w, height = 380 }: { window: HeroWindow; hei
               <i className="sw" /> Cleared price
             </span>
             <span className="key">
-              <i className="sw model" /> Forecast
+              <i className="sw model" /> Forecast, full model
             </span>
             <span className="key">
               <i className="sw bandkey" /> p10 to p90 band
@@ -79,9 +79,9 @@ export function HeroChart({ window: w, height = 380 }: { window: HeroWindow; hei
               </span>
             )}
             <span className="grow small">
-              {w.stats.nHours} hours
-              {w.stats.mae != null && <> · MAE {fmtNum(w.stats.mae, 1)} €/MWh</>}
-              {w.stats.coverage != null && <> · {fmtNum(w.stats.coverage * 100, 0)}% inside the band</>}
+              {w.days.length === 1 ? "This day" : `These ${w.days.length} days`}: MAE {w.stats.mae != null ? fmtNum(w.stats.mae, 1) : "–"} €/MWh
+              {yearMae != null && <>, over the whole eval year {fmtNum(yearMae, 2)}</>}
+              {w.stats.coverage != null && <> · {fmtNum(w.stats.coverage * 100, 0)}% of hours inside the band</>}
             </span>
           </>
         ) : (
@@ -90,10 +90,10 @@ export function HeroChart({ window: w, height = 380 }: { window: HeroWindow; hei
               {hours[h].dayLabel}, {fmtHourLabel(hours[h].hour)}
             </span>
             <span className="val">
-              Cleared <b>{actualAt == null ? "–" : `${fmtSigned(actualAt, 1)} €/MWh`}</b>
+              Cleared <b>{actualAt == null ? "–" : `${fmtPrice(actualAt, 1)} €/MWh`}</b>
             </span>
             <span className="val" style={{ color: "var(--volt)" }}>
-              Forecast <b style={{ color: "var(--volt)" }}>{predAt == null ? "–" : `${fmtSigned(predAt, 1)} €/MWh`}</b>
+              Forecast <b style={{ color: "var(--volt)" }}>{predAt == null ? "–" : `${fmtPrice(predAt, 1)} €/MWh`}</b>
             </span>
             <span className="val">
               Band <b>{lo == null || hi == null ? "–" : `${fmtNum(lo, 0)} to ${fmtNum(hi, 0)}`}</b>

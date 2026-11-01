@@ -1,8 +1,11 @@
 import { useEffect, useState } from "react";
 import { HeroChart } from "../charts/HeroChart";
-import { fmtDateTime, fmtNum } from "../lib/format";
+import { LineChart } from "../charts/LineChart";
+import { fmtCalendarDate, fmtDateTime, fmtHourLabel, fmtNum } from "../lib/format";
+import { hasRecordedForecasts, lastScoredDay, liveTomorrow } from "../lib/live";
+import type { Loadable } from "../lib/useData";
 import { pickHeroWindow } from "../lib/hero";
-import type { ForecastData, HealthData } from "../types";
+import type { ForecastData, ForwardLedgerData, HealthData } from "../types";
 
 export function Masthead() {
   return (
@@ -47,28 +50,40 @@ function useHeroDays(): number {
 export function Hero({
   forecast,
   health,
+  ledger,
 }: {
-  forecast: { state: "loading" | "missing" } | { state: "ready"; data: ForecastData };
-  health: { state: "loading" | "missing" } | { state: "ready"; data: HealthData };
+  forecast: Loadable<ForecastData>;
+  health: Loadable<HealthData>;
+  ledger: Loadable<ForwardLedgerData>;
 }) {
   const days = useHeroDays();
   const ready = forecast.state === "ready" ? forecast.data : null;
   const win = ready ? pickHeroWindow(ready.recent, days) : null;
   const nHours = ready?.eval.models.lgbm_point?.n;
+  const led = ledger.state === "ready" ? ledger.data : null;
+  const tomorrow = liveTomorrow(led);
+  const recording = hasRecordedForecasts(led);
 
   return (
     <section className="hero" id="top" aria-label="Forecast against cleared prices">
       <div className="wrap">
         <div className="hero-head">
-          <h1>Tomorrow&apos;s German power price, forecast before the auction closes.</h1>
+          {tomorrow ? (
+            <h1>Tomorrow&apos;s German power price, forecast before the auction closes.</h1>
+          ) : (
+            <h1>Germany&apos;s day-ahead power price, forecast hour by hour and scored against what cleared.</h1>
+          )}
           <div>
             <p className="lede">
-              A LightGBM model predicts all 24 hourly day-ahead prices
+              Hourly day-ahead price forecasts from a LightGBM model
               {ready && nHours
                 ? `, validated walk-forward over ${ready.eval.eval_period.n_days} days (${fmtNum(nHours)} out-of-sample hours)`
                 : ""}
-              , scored against three baselines and recorded live every morning. It runs on GitHub
-              Actions alone, with no server.
+              , compared with naive and linear baselines.{" "}
+              {recording
+                ? "A forward ledger records every forecast before the auction closes and scores it afterwards."
+                : "A forward ledger that records each forecast before the auction closes, and scores it afterwards, starts with the first daily run."}{" "}
+              It runs on GitHub Actions alone, with no server.
             </p>
             {health.state === "ready" && (
               <p className="hero-meta">
@@ -79,16 +94,52 @@ export function Hero({
           </div>
         </div>
 
+        {tomorrow && led && <Tomorrow latest={tomorrow} ledger={led} />}
+
         {win ? (
           <>
-            <HeroChart window={win} height={days === 2 ? 320 : 380} />
-            <p className="small" style={{ marginTop: 12, maxWidth: "74ch" }}>
-              Backtest, not live: the last {win.days.length} complete delivery days of the walk-forward evaluation,
-              forecast made without knowing the cleared prices. The band is the raw model p10 to p90.
+            <HeroChart window={win} height={days === 2 ? 320 : 380} yearMae={ready?.eval.models.lgbm_point?.mae} />
+            <p className="small" style={{ marginTop: 12, maxWidth: "76ch" }}>
+              Backtest, not live: the last {win.days.length} complete delivery days of the walk-forward evaluation. The
+              forecast is the full model, which assumes the TSOs&apos; generation forecast for the delivery day is
+              known; the band is its raw p10 to p90.
             </p>
           </>
         ) : null}
       </div>
     </section>
+  );
+}
+
+/* The one place the page may say "tomorrow": the ledger's open forecast, drawn
+   without a cleared-price line because there is none yet. */
+function Tomorrow({ latest, ledger }: { latest: NonNullable<ForwardLedgerData["latest"]>; ledger: ForwardLedgerData }) {
+  const last = lastScoredDay(ledger);
+  return (
+    <div className="tomorrow">
+      <p className="subhead" style={{ marginTop: 0 }}>
+        Delivery day {fmtCalendarDate(latest.target_date)}: forecast recorded {fmtDateTime(latest.generated_at_utc)}.
+        The day-ahead auction clears at 12:00 and no cleared price exists yet.
+      </p>
+      <div className="chart-plate">
+        <LineChart
+          height={260}
+          endLabels
+          series={[
+            { key: "pred", label: "Forecast", color: "var(--volt)", values: latest.pred_model as (number | null)[], width: 2.75 },
+            { key: "naive", label: "Naive", color: "var(--naive)", values: latest.pred_naive as (number | null)[], dashed: true },
+          ]}
+          xLabels={latest.hours_local.map(fmtHourLabel)}
+          unit="€/MWh"
+          xTickEvery={3}
+        />
+      </div>
+      {last && last.maeModel != null && last.maeNaive != null && (
+        <p className="small" style={{ marginTop: 10 }}>
+          Last scored day, {fmtCalendarDate(last.date)}: forecast error {fmtNum(last.maeModel, 1)} €/MWh against{" "}
+          {fmtNum(last.maeNaive, 1)} for the naive forecast.
+        </p>
+      )}
+    </div>
   );
 }

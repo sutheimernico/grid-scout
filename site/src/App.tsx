@@ -49,7 +49,7 @@ export default function App() {
     <>
       <Masthead />
       <main>
-        <Hero forecast={forecast} health={health} />
+        <Hero forecast={forecast} health={health} ledger={ledger} />
 
         {forecast.state === "ready" ? (
           <>
