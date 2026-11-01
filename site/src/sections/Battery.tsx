@@ -1,5 +1,6 @@
 import { LineChart } from "../charts/LineChart";
 import { fmtMonthYear, fmtNum, fmtPct, fmtSigned } from "../lib/format";
+import { revenueSplit, splitWidths, type RevenueSplit } from "../lib/battery";
 import { sensitivityMatrix } from "../lib/sensitivity";
 import type { BatteryData, BatterySensitivity } from "../types";
 import { Reveal } from "../ui";
@@ -8,6 +9,7 @@ const kFmt = (v: number) => `${Math.round(v / 1000)}k`;
 
 export function Battery({ data }: { data: BatteryData }) {
   const s = data.summary;
+  const split = revenueSplit(s);
   const months = data.daily.days.map(fmtMonthYear);
   return (
     <section className="band plate" id="battery" aria-label="Battery arbitrage backtest">
@@ -15,34 +17,27 @@ export function Battery({ data }: { data: BatteryData }) {
         <div className="split wide-left">
           <Reveal>
             <p className="small" style={{ marginBottom: 6 }}>
-              What is the forecast worth to a battery?
+              What the forecast adds to a {s.battery.power_mw} MW / {s.battery.capacity_mwh} MWh battery
             </p>
             <div className="big-figure">
-              {fmtNum(s.revenue_eur.model)}
-              <small>€ a year</small>
+              {fmtSigned(split.edge)}
+              <small>€ a year{split.edgePct != null ? `, ${fmtSigned(split.edgePct, 1)}%` : ""}</small>
             </div>
-            <h2 style={{ marginTop: 18, maxWidth: "24ch" }}>
-              {fmtPct(s.capture_rate_model)} of what perfect foresight earns
+            <h2 style={{ marginTop: 18, maxWidth: "26ch" }}>
+              Most of the revenue is the battery, not the forecast
             </h2>
             <p className="note" style={{ marginTop: 16 }}>
-              Battery arbitrage backtest: a {s.battery.power_mw} MW / {s.battery.capacity_mwh} MWh battery trades the
-              day-ahead auction, charging cheap and discharging expensive, one cycle per day, {fmtNum(
-                s.battery.round_trip_efficiency * 100,
-                0,
-              )}
-              % round-trip efficiency, schedules from an exact LP. Same year as the forecast eval. Gross revenue — no
-              grid fees or degradation modeled.
+              Even the naive forecast earns {fmtNum(split.naive)} € a year, because a battery that charges at night and
+              discharges in the evening captures most of the daily spread. The forecast's value is the difference to
+              that: {fmtSigned(split.edge)} €, and {fmtPct(s.capture_rate_model)} of perfect foresight instead of{" "}
+              {fmtPct(s.capture_rate_naive)}. One cycle per day, {fmtNum(s.battery.round_trip_efficiency * 100, 0)}%
+              round-trip efficiency, schedules from an exact LP, same year as the forecast eval. Gross revenue, no grid
+              fees or degradation. The schedules use the full model's forecasts (TSO generation forecast assumed
+              known); this backtest has not been re-run on pre-auction forecasts.
             </p>
           </Reveal>
           <Reveal>
-            <dl className="kv stacked">
-              <dt>Revenue with the naive forecast</dt>
-              <dd className="num" style={{ fontSize: 26 }}>{fmtNum(s.revenue_eur.naive)} €/yr</dd>
-              <dt>Perfect foresight (upper bound)</dt>
-              <dd className="num" style={{ fontSize: 26 }}>{fmtNum(s.revenue_eur.perfect)} €/yr</dd>
-              <dt>Model edge over naive: the forecast&apos;s economic value</dt>
-              <dd className="num" style={{ fontSize: 26, color: "var(--volt)" }}>{fmtSigned(s.model_edge_over_naive_eur)} €/yr</dd>
-            </dl>
+            <RevenueBar split={split} />
           </Reveal>
         </div>
 
@@ -135,5 +130,37 @@ function Sensitivity({ sweep }: { sweep?: BatterySensitivity }) {
         </table>
       </div>
     </Reveal>
+  );
+}
+
+/* One bar, scaled to perfect foresight and starting at zero: what any forecast
+   earns, what this forecast adds, what is still on the table. */
+function RevenueBar({ split }: { split: RevenueSplit }) {
+  const w = splitWidths(split);
+  return (
+    <div className="revbar" role="img" aria-label={`Revenue per year: naive ${fmtNum(split.naive)} euro, model adds ${fmtSigned(split.edge)}, ${fmtNum(split.gap)} short of perfect foresight`}>
+      <div className="revbar-track">
+        <i className="seg naive grow-x" style={{ width: `${w.naive}%` }} />
+        <i className="seg edge grow-x" style={{ width: `${w.edge}%`, left: `${w.naive}%`, ["--delay" as string]: "250ms" }} />
+        <i className="seg gap grow-x" style={{ width: `${w.gap}%`, left: `${w.naive + w.edge}%`, ["--delay" as string]: "450ms" }} />
+      </div>
+      <ul className="revbar-key">
+        <li>
+          <i className="sw naive" />
+          <b>{fmtNum(split.naive)} €</b>
+          <span>naive forecast: yesterday&apos;s prices</span>
+        </li>
+        <li>
+          <i className="sw edge" />
+          <b style={{ color: "var(--volt)" }}>{fmtSigned(split.edge)} €</b>
+          <span>added by the model forecast</span>
+        </li>
+        <li>
+          <i className="sw gap" />
+          <b>{fmtNum(split.gap)} €</b>
+          <span>still missing to perfect foresight ({fmtNum(split.perfect)} €)</span>
+        </li>
+      </ul>
+    </div>
   );
 }

@@ -1,6 +1,6 @@
 import { LineChart } from "../charts/LineChart";
 import { StackedArea } from "../charts/StackedArea";
-import { fmtDay, fmtNum, fmtPct } from "../lib/format";
+import { fmtDateTime, fmtDay, fmtNum, fmtPct, unitSpelling } from "../lib/format";
 import type { MarketData } from "../types";
 import { Reveal } from "../ui";
 
@@ -59,7 +59,7 @@ export function Market({ data }: { data: MarketData }) {
               {fmtNum(k.latest_price_eur_mwh, 2)}
               <small>€/MWh</small>
             </b>
-            <span>latest day-ahead price</span>
+            <span>latest day-ahead price, {fmtDateTime(k.latest_price_at)} Berlin time</span>
           </div>
           <div className="kpi">
             <b>{fmtNum(k.negative_price_hours_ytd)}</b>
@@ -116,7 +116,7 @@ export function Market({ data }: { data: MarketData }) {
           {data.explanation && (
             <Reveal className="stack">
               <p className="happened-label">What happened on {data.explanation.day}</p>
-              <p className="happened">{data.explanation.caption}</p>
+              <p className="happened">{unitSpelling(data.explanation.caption)}</p>
               <p className="small">
                 Assembled by rule from the same numbers the charts show — no model, nothing that can invent a driver.
               </p>

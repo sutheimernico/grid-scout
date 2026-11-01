@@ -1,16 +1,15 @@
 import { Heatmap } from "../charts/Heatmap";
+import { healthTone, type Tone } from "../lib/freshness";
 import type { Loadable } from "../lib/useData";
 import type { HealthData, HealthEntry, ReportEntry, UptimeData } from "../types";
 import { Pending, Reveal } from "../ui";
 
-/* A series SMARD stopped publishing is not a fault — it renders muted, never red,
-   so the only coloured rows in this panel are ones somebody can act on. */
-function healthColor(status: HealthEntry["status"]): string {
-  if (status === "ok") return "var(--good)";
-  if (status === "stale") return "var(--warning)";
-  if (status === "discontinued") return "var(--ink-muted)";
-  return "var(--critical)";
-}
+const TONE_VAR: Record<Tone, string> = {
+  good: "var(--good)",
+  warning: "var(--warning)",
+  critical: "var(--critical)",
+  muted: "var(--ink-muted)",
+};
 
 /* Report rows: only a report that promised a cadence and missed it turns red.
    A manual, unknown or never-produced report is muted, not an alarm. */
@@ -55,7 +54,7 @@ export function Health({ health, uptime }: { health: Loadable<HealthData>; uptim
               <div className="health-list">
                 {Object.entries(health.data.series).map(([name, s]) => (
                   <div className="health-item" key={name} title={s.note ?? name}>
-                    <span className="dot" style={{ background: healthColor(s.status) }} />
+                    <span className="dot" style={{ background: TONE_VAR[healthTone(s)] }} />
                     <span className="name">{s.label ?? name}</span>
                     <span className="age">{healthAge(s)}</span>
                   </div>
@@ -96,11 +95,16 @@ function Uptime({ uptime }: { uptime: Loadable<UptimeData> }) {
   return (
     <Reveal className="split even" threshold={0.25}>
       <div className="stack" style={{ marginTop: 48 }}>
-      <h3>
-        {totals.days} days live · {totals.runs} published refreshes ·{" "}
-        {totals.days_with_zero_runs === 0
-          ? "no silent day"
-          : `${totals.days_with_zero_runs} silent ${totals.days_with_zero_runs === 1 ? "day" : "days"} (longest streak ${totals.longest_silent_streak_days})`}
+      <h3 className="facts">
+        <span>{totals.days} days live</span>
+        <span>{totals.runs} published refreshes</span>
+        <span>
+          {totals.days_with_zero_runs === 0
+            ? "no day without a refresh"
+            : `${totals.days_with_zero_runs} ${totals.days_with_zero_runs === 1 ? "day" : "days"} without a refresh${
+                totals.days_with_zero_runs > 1 ? `, longest run of ${totals.longest_silent_streak_days} in a row` : ""
+              }`}
+        </span>
       </h3>
       <p className="note">
         Since {first_day}. A cell counts refreshes the pipeline actually published that day. A run that finds no new
