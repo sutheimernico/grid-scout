@@ -1,4 +1,4 @@
-import { act, cleanup, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App, { SETTLE_TIMEOUT_MS, sumMembers } from "./App";
 import type {
@@ -310,16 +310,16 @@ describe("App states", () => {
     render(<App />);
     expect(screen.getByText(/market data not produced yet/)).toBeTruthy();
     expect(screen.getByText(/agent evaluation not produced yet/)).toBeTruthy();
-    // no headline tiles without market/forecast/battery
-    expect(screen.queryByText("Battery capture rate")).toBeNull();
+    // no headline figures without the battery and forecast artifacts
+    expect(screen.queryByText(/of what perfect foresight earns/)).toBeNull();
+    expect(screen.queryByText(/less error than copying/)).toBeNull();
   });
 
   it("renders every section once the artifacts are there", () => {
     setReady();
     render(<App />);
-    expect(screen.getByText("Battery capture rate")).toBeTruthy();
-    expect(screen.getByText("93.2")).toBeTruthy(); // capture rate tile
-    expect(screen.getByText("+44.0")).toBeTruthy(); // forecast skill tile
+    expect(screen.getByText(/93\.2% of what perfect foresight earns/)).toBeTruthy();
+    expect(screen.getByText(/44\.0% less error than copying/)).toBeTruthy();
     expect(screen.getByText(/Generation mix/)).toBeTruthy();
     expect(screen.getByText(forecast.eval.finding)).toBeTruthy();
     expect(screen.getByText(/Sample transcripts/)).toBeTruthy();
@@ -340,13 +340,13 @@ describe("live forward test", () => {
     render(<App />);
     expect(screen.getByText(/No scored day yet/)).toBeTruthy();
     expect(screen.getByText(/outcome still open/)).toBeTruthy();
-    expect(screen.queryByText("MAE model (cumulative)")).toBeNull();
+    expect(screen.queryByText(/MAE model \(cumulative\)/)).toBeNull();
   });
 
   it("shows the track record once days are scored", () => {
     setReady();
     render(<App />);
-    expect(screen.getByText("MAE model (cumulative)")).toBeTruthy();
+    expect(screen.getByText(/MAE model \(cumulative\)/)).toBeTruthy();
     expect(screen.getByText("12.34")).toBeTruthy();
     expect(screen.getByText(/model beat naive on 3\/4 days/)).toBeTruthy();
     expect(screen.getByText(/cleared prices overlaid/)).toBeTruthy();
@@ -401,7 +401,7 @@ describe("battery sensitivity", () => {
   it("stays out of the page until the weekly sweep has run", () => {
     setReady();
     render(<App />);
-    expect(screen.queryByText(/does the edge depend on the battery/)).toBeNull();
+    expect(screen.queryByText(/Does the edge depend on the battery/)).toBeNull();
   });
 
   it("renders the six-cell grid and the range of the edge", () => {
@@ -412,8 +412,10 @@ describe("battery sensitivity", () => {
     });
     const { container } = render(<App />);
     expect(screen.getByText(/beats naive in all 6 configurations, by 4,363–8,584 €\/MW\/yr/)).toBeTruthy();
-    const panel = screen.getByText(/does the edge depend on the battery/).closest(".panel")!;
-    expect(panel.querySelectorAll("tbody tr").length).toBe(6);
+    expect(screen.getByText(/Does the edge depend on the battery/)).toBeTruthy();
+    // 3 efficiencies x 2 durations
+    expect(container.querySelectorAll(".matrix tbody tr").length).toBe(3);
+    expect(container.querySelectorAll(".matrix tbody td").length).toBe(6);
     expect(container.textContent).toContain("+8,584");
   });
 
@@ -424,7 +426,7 @@ describe("battery sensitivity", () => {
       data: { ...battery, sensitivity: sweep([-120, 800, 300, 900, 400, 1000]) },
     });
     render(<App />);
-    expect(screen.getByText(/does not beat naive in every configuration \(edge -120 to 1,000/)).toBeTruthy();
+    expect(screen.getByText(/does not beat naive in every configuration \(edge \u2212120 to 1,000/)).toBeTruthy();
   });
 });
 
@@ -450,7 +452,7 @@ describe("uptime calendar", () => {
     setReady();
     const { container } = render(<App />);
     expect(screen.getByText(/3 days live · 12 published refreshes/)).toBeTruthy();
-    expect(screen.getByText(/1 silent days \(longest streak 1\)/)).toBeTruthy();
+    expect(screen.getByText(/1 silent day \(longest streak 1\)/)).toBeTruthy();
     const cells = container.querySelectorAll("svg.heatmap rect");
     expect(cells.length).toBe(3);
     // the silent day renders as an empty cell, not as a faint green one
@@ -522,6 +524,77 @@ describe("derived report freshness", () => {
     const { container } = render(<App />);
     expect(container.textContent).not.toContain("Derived reports");
     expect(container.querySelectorAll(".health-item").length).toBe(5);
+  });
+});
+
+describe("hero chart", () => {
+  // 24 hourly points = exactly the Berlin day 2026-09-20 (CEST, UTC+2)
+  const t0 = new Date("2026-09-19T22:00:00Z").getTime();
+  const fullDay = {
+    timestamps: Array.from({ length: 24 }, (_, i) => new Date(t0 + i * 3_600_000).toISOString()),
+    actual: Array.from({ length: 24 }, (_, i) => (i === 3 ? -4 : 50 + i)),
+    predicted: Array.from({ length: 24 }, (_, i) => 52 + i),
+    q10: Array.from({ length: 24 }, (_, i) => 30 + i),
+    q90: Array.from({ length: 24 }, (_, i) => 80 + i),
+  };
+
+  it("draws the backtest day with its band once a full delivery day exists", () => {
+    setReady();
+    artifacts.set("forecast.json", { state: "ready", data: { ...forecast, recent: fullDay } });
+    render(<App />);
+    expect(screen.getByRole("img", { name: /Day-ahead forecast against cleared prices for Sun 20 Sep/ })).toBeTruthy();
+    expect(screen.getByText(/Backtest, not live/)).toBeTruthy();
+    expect(screen.getByText(/24 hours · MAE 4\.4 €\/MWh · 96% inside the band/)).toBeTruthy();
+  });
+
+  it("shows no hero chart when no complete day is available, instead of a half day", () => {
+    setReady();
+    render(<App />); // the fixture series has three hours only
+    expect(screen.queryByRole("img", { name: /Day-ahead forecast against cleared prices/ })).toBeNull();
+  });
+
+  it("reads the hour under the arrow keys into the readout", () => {
+    setReady();
+    artifacts.set("forecast.json", { state: "ready", data: { ...forecast, recent: fullDay } });
+    render(<App />);
+    const chart = screen.getByRole("img", { name: /Day-ahead forecast against cleared prices/ });
+    fireEvent.keyDown(chart, { key: "ArrowRight" });
+    expect(screen.getByText(/Sun 20 Sep, 00:00/)).toBeTruthy();
+    fireEvent.keyDown(chart, { key: "ArrowRight" });
+    fireEvent.keyDown(chart, { key: "ArrowRight" });
+    fireEvent.keyDown(chart, { key: "ArrowRight" });
+    // hour 3 cleared below zero: the minus is a real minus sign
+    expect(screen.getByText(/\u22124\.0 €\/MWh/)).toBeTruthy();
+    fireEvent.keyDown(chart, { key: "Escape" });
+    expect(screen.queryByText(/Sun 20 Sep, 03:00/)).toBeNull();
+  });
+});
+
+describe("ledger section", () => {
+  it("labels the protocol as a description, not data, while there is no ledger", () => {
+    setAll("missing");
+    render(<App />);
+    expect(screen.getByText(/The protocol, not data/)).toBeTruthy();
+  });
+
+  it("lists scored and pending days with a verdict against naive", () => {
+    setReady();
+    artifacts.set("forward_ledger.json", {
+      state: "ready",
+      data: {
+        ...scoredLedger,
+        days: [
+          { target_date: "2026-09-19", generated_at_utc: "x", scored: true, mae_model: 10, mae_naive: 20, mae_snaive7: 25 },
+          { target_date: "2026-09-20", generated_at_utc: "x", scored: true, mae_model: 30, mae_naive: 20, mae_snaive7: 25 },
+          { target_date: "2026-09-21", generated_at_utc: "x", scored: false, mae_model: null, mae_naive: null, mae_snaive7: null },
+        ],
+      },
+    });
+    const { container } = render(<App />);
+    const rows = Array.from(container.querySelectorAll(".ledger-row"));
+    expect(rows.map((r) => r.className.replace("ledger-row ", ""))).toEqual(["pending", "loss", "win"]);
+    expect(within(rows[0] as HTMLElement).getByText("pending")).toBeTruthy();
+    expect(within(rows[1] as HTMLElement).getByText(/\u221210\.0/)).toBeTruthy();
   });
 });
 
