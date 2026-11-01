@@ -56,8 +56,9 @@ export function buildScoreboard(evalData: ForecastData["eval"]): ScoreRow[] {
   return rows.sort((a, b) => b.mae - a.mae);
 }
 
-/** Upper end of the ruler: the worst MAE rounded up to the next 10. */
+/** Upper end of the ruler: the worst MAE plus room for its value label, rounded
+ *  up to the next 10. */
 export function rulerMax(rows: ScoreRow[]): number {
   const worst = Math.max(0, ...rows.map((r) => r.mae));
-  return Math.max(10, Math.ceil(worst / 10) * 10);
+  return Math.max(10, Math.ceil((worst * 1.25) / 10) * 10);
 }

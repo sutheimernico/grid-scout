@@ -78,3 +78,22 @@ export function bandPath(
   if (!up.length) return "";
   return `M${up.join("L")}L${down.join("L")}Z`;
 }
+
+/** Vertical positions for labels that would otherwise overlap: keeps the order,
+ *  pushes neighbours apart to at least `minGap`, and stays inside [min, max]. */
+export function spreadLabels(ys: number[], minGap: number, min: number, max: number): number[] {
+  const order = ys.map((_, i) => i).sort((a, b) => ys[a] - ys[b]);
+  const out = new Array<number>(ys.length);
+  let prev = -Infinity;
+  for (const i of order) {
+    out[i] = Math.max(ys[i], prev + minGap, min);
+    prev = out[i];
+  }
+  let next = Infinity;
+  for (let k = order.length - 1; k >= 0; k--) {
+    const i = order[k];
+    out[i] = Math.min(out[i], next - minGap, max);
+    next = out[i];
+  }
+  return out;
+}

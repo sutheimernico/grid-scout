@@ -52,8 +52,8 @@ describe("buildScoreboard", () => {
 });
 
 describe("rulerMax", () => {
-  it("rounds the worst error up to a clean ten", () => {
-    expect(rulerMax(buildScoreboard(base))).toBe(40);
+  it("leaves room for the value label after the longest bar", () => {
+    expect(rulerMax(buildScoreboard(base))).toBe(50);
     expect(rulerMax([])).toBe(10);
   });
 });

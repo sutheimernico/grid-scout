@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bandPath, extent, linePath, linearScale, ticks } from "./scale";
+import { bandPath, extent, linePath, linearScale, spreadLabels, ticks } from "./scale";
 
 describe("linearScale", () => {
   it("maps domain to range linearly", () => {
@@ -78,5 +78,24 @@ describe("bandPath", () => {
   it("skips indices where either side is null", () => {
     const d = bandPath([10, null], [0, 0], (i) => i, (v) => v);
     expect(d).toBe("M0.0,10.0L0.0,0.0Z");
+  });
+});
+
+describe("spreadLabels", () => {
+  it("leaves well-spaced labels alone", () => {
+    expect(spreadLabels([10, 50, 90], 14, 0, 100)).toEqual([10, 50, 90]);
+  });
+
+  it("pushes crowded labels apart and keeps their order", () => {
+    const out = spreadLabels([40, 42, 44], 14, 0, 200);
+    expect(out[1] - out[0]).toBeGreaterThanOrEqual(14);
+    expect(out[2] - out[1]).toBeGreaterThanOrEqual(14);
+    expect(out[0]).toBeLessThan(out[1]);
+  });
+
+  it("does not move a label out of bounds", () => {
+    const out = spreadLabels([98, 99], 14, 0, 100);
+    expect(Math.max(...out)).toBeLessThanOrEqual(100);
+    expect(out[1] - out[0]).toBeGreaterThanOrEqual(14);
   });
 });
