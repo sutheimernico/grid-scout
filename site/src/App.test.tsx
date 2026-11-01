@@ -311,14 +311,15 @@ describe("App states", () => {
     expect(screen.getByText(/market data not produced yet/)).toBeTruthy();
     expect(screen.getByText(/agent evaluation not produced yet/)).toBeTruthy();
     // no headline figures without the battery and forecast artifacts
-    expect(screen.queryByText(/of what perfect foresight earns/)).toBeNull();
+    expect(screen.queryByText(/Most of the revenue is the battery/)).toBeNull();
     expect(screen.queryByText(/less error than copying/)).toBeNull();
   });
 
   it("renders every section once the artifacts are there", () => {
     setReady();
     render(<App />);
-    expect(screen.getByText(/93\.2% of what perfect foresight earns/)).toBeTruthy();
+    expect(screen.getByText(/Most of the revenue is the battery, not the forecast/)).toBeTruthy();
+    expect(screen.getByText(/\+3,284/, { selector: ".big-figure" })).toBeTruthy();
     expect(screen.getByText(/44\.0% less error than copying/)).toBeTruthy();
     expect(screen.getByText(/Generation mix/)).toBeTruthy();
     expect(screen.getByText(forecast.eval.finding)).toBeTruthy();
@@ -451,8 +452,9 @@ describe("uptime calendar", () => {
   it("leads with the streak and names the silent days instead of hiding them", () => {
     setReady();
     const { container } = render(<App />);
-    expect(screen.getByText(/3 days live · 12 published refreshes/)).toBeTruthy();
-    expect(screen.getByText(/1 silent day \(longest streak 1\)/)).toBeTruthy();
+    expect(screen.getByText(/3 days live/)).toBeTruthy();
+    expect(screen.getByText(/12 published refreshes/)).toBeTruthy();
+    expect(screen.getByText(/1 day without a refresh/)).toBeTruthy();
     const cells = container.querySelectorAll("svg.heatmap rect");
     expect(cells.length).toBe(3);
     // the silent day renders as an empty cell, not as a faint green one
@@ -544,7 +546,7 @@ describe("hero chart", () => {
     render(<App />);
     expect(screen.getByRole("img", { name: /Day-ahead forecast against cleared prices for Sun 20 Sep/ })).toBeTruthy();
     expect(screen.getByText(/Backtest, not live/)).toBeTruthy();
-    expect(screen.getByText(/24 hours · MAE 4\.4 €\/MWh · 96% inside the band/)).toBeTruthy();
+    expect(screen.getByText(/This day: MAE 4\.4 €\/MWh, over the whole eval year 15\.25 · 96% of hours inside the band/)).toBeTruthy();
   });
 
   it("shows no hero chart when no complete day is available, instead of a half day", () => {
@@ -567,6 +569,43 @@ describe("hero chart", () => {
     expect(screen.getByText(/\u22124\.0 €\/MWh/)).toBeTruthy();
     fireEvent.keyDown(chart, { key: "Escape" });
     expect(screen.queryByText(/Sun 20 Sep, 03:00/)).toBeNull();
+  });
+});
+
+describe("honest headline", () => {
+  it("does not promise a tomorrow forecast while the ledger is empty", () => {
+    setAll("missing");
+    artifacts.set("forecast.json", { state: "ready", data: forecast });
+    render(<App />);
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toMatch(/scored against what cleared/);
+    expect(screen.queryByText(/recorded live every morning/)).toBeNull();
+    expect(screen.getByText(/starts with the first daily run/)).toBeTruthy();
+  });
+
+  it("says tomorrow only when an open forecast exists, and draws no cleared price for it", () => {
+    setReady();
+    artifacts.set("forward_ledger.json", { state: "ready", data: pendingLedger });
+    render(<App />);
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toMatch(/Tomorrow's German power price/);
+    expect(screen.getByText(/no cleared price exists yet/)).toBeTruthy();
+    expect(screen.getByText(/A forward ledger records every forecast/)).toBeTruthy();
+  });
+
+  it("leads with the pre-auction number and says which model drives the rest", () => {
+    setReady();
+    artifacts.set("forecast.json", {
+      state: "ready",
+      data: {
+        ...forecast,
+        eval: {
+          ...forecast.eval,
+          pre_auction: { skill_vs_naive_pct: 17.6, models: { lgbm_pre_auction: { mae: 25.24, rmse: 38 } } },
+        },
+      },
+    });
+    render(<App />);
+    expect(screen.getByRole("heading", { level: 2, name: /17\.6% less error than yesterday's prices, on public pre-auction data/ })).toBeTruthy();
+    expect(screen.getByText(/battery backtest below all use the second/)).toBeTruthy();
   });
 });
 
