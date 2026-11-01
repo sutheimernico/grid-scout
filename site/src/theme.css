@@ -733,6 +733,16 @@ table.data-table td.neg {
   margin-bottom: 14px;
 }
 
+.kv.stacked.row {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0 24px;
+}
+@media (min-width: 561px) and (max-width: 900px) {
+  .split.wide-left .kv.stacked {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0 24px;
+  }
+}
 .matrix {
   border-collapse: separate;
   border-spacing: 0;
