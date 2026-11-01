@@ -1,6 +1,6 @@
 import type { ScoreRow } from "../lib/scoreboard";
 import { rulerMax } from "../lib/scoreboard";
-import { fmtSigned } from "../lib/format";
+import { fmtNum } from "../lib/format";
 import { CountUp } from "../ui";
 import { useInView } from "../lib/motion";
 
@@ -34,7 +34,7 @@ export function Scoreboard({ rows }: { rows: ScoreRow[] }) {
               </span>
               {r.skillVsNaive != null && r.key !== "naive_yesterday" && (
                 <span className={`chip ${r.skillVsNaive > 0 ? "up" : ""}`}>
-                  {fmtSigned(r.skillVsNaive, 1)}% vs yesterday
+                  {fmtNum(Math.abs(r.skillVsNaive), 1)}% {r.skillVsNaive > 0 ? "less" : "more"} error
                 </span>
               )}
             </div>
@@ -54,7 +54,7 @@ export function Scoreboard({ rows }: { rows: ScoreRow[] }) {
         );
       })}
       <p className="ruler-caption">
-        Mean absolute error in €/MWh, out-of-sample; lower is better. The bars start at zero.
+        Mean absolute error in €/MWh, out-of-sample; lower is better. The bars start at zero. Percentages compare with yesterday's prices.
       </p>
     </div>
   );

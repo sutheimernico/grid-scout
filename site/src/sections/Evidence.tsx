@@ -1,7 +1,7 @@
 import { Calibration } from "../charts/Calibration";
 import { Scoreboard } from "../charts/Scoreboard";
 import { SkillBars } from "../charts/SkillBars";
-import { fmtNum, fmtSigned } from "../lib/format";
+import { fmtNum, fmtSigned, unitSpelling } from "../lib/format";
 import { buildScoreboard } from "../lib/scoreboard";
 import { losingSlices, segmentExtremes } from "../lib/segments";
 import type { ForecastData, SegmentAnalysis } from "../types";
@@ -11,18 +11,25 @@ export function Evidence({ data }: { data: ForecastData }) {
   const { eval: ev } = data;
   const rows = buildScoreboard(ev);
   const q = ev.quantiles;
+  const pre = ev.pre_auction;
   return (
     <section className="band plate" id="forecast" aria-label="Forecast accuracy">
       <div className="wrap">
         <div className="split">
           <Reveal className="stack">
-            <h2>{fmtNum(ev.skill.lgbm_vs_naive_pct, 1)}% less error than copying yesterday&apos;s prices</h2>
-            <p className="note">{ev.finding}</p>
+            <h2>
+              {pre
+                ? `${fmtNum(pre.skill_vs_naive_pct, 1)}% less error than yesterday's prices, on public pre-auction data`
+                : `${fmtNum(ev.skill.lgbm_vs_naive_pct, 1)}% less error than copying yesterday's prices`}
+            </h2>
+            <p className="note">{unitSpelling(ev.finding)}</p>
             <p className="note">
-              The backtest assumes the grid operators&apos; generation forecasts for the delivery day are known at gate
-              closure, as they are for a trader with TSO feeds. SMARD itself publishes them only after the auction, so
-              the ruler also scores the model on strictly pre-auction inputs. Every number is out-of-sample: expanding
-              walk-forward over a full year, refit weekly.
+              {pre
+                ? `Two models, two answers: ${fmtNum(pre.skill_vs_naive_pct, 1)}% with inputs published before the auction, ${fmtNum(ev.skill.lgbm_vs_naive_pct, 1)}% when the TSOs' generation forecast for the delivery day is assumed known, as it is for a trader with TSO feeds. `
+                : ""}
+              The hero chart, the band, the hour and weekday slices and the battery backtest below all use the second,
+              full model; the battery backtest has not been re-run on pre-auction forecasts. Every number is
+              out-of-sample: expanding walk-forward over a full year, refit weekly.
             </p>
           </Reveal>
           <Reveal>
@@ -79,7 +86,7 @@ export function Segments({ segments }: { segments?: SegmentAnalysis }) {
                 : "Where the model wins and where it does not"}
             </h2>
             <p className="note" style={{ marginTop: 18 }}>
-              Where the model wins — and where it does not. Skill against the naive baseline per slice of the same{" "}
+              Where the model wins — and where it does not. Full model, skill against the naive baseline per slice of the same{" "}
               {fmtNum(segments.n_hours)} out-of-sample hours. Above zero the model wins, below zero the baseline does.{" "}
               {losing.length === 0
                 ? `No slice where a baseline beats the model in this eval period${
@@ -107,7 +114,7 @@ export function Segments({ segments }: { segments?: SegmentAnalysis }) {
               <tbody>
                 {segments.by_regime.map((s) => (
                   <tr key={s.segment}>
-                    <td title={segments.definitions[s.segment]}>{s.segment}</td>
+                    <td title={unitSpelling(segments.definitions[s.segment] ?? "")}>{s.segment}</td>
                     <td>{fmtNum(s.n)}</td>
                     <td>{fmtNum(s.mae_model, 2)}</td>
                     <td>{fmtNum(s.mae_naive, 2)}</td>
@@ -122,7 +129,7 @@ export function Segments({ segments }: { segments?: SegmentAnalysis }) {
               {segments.by_regime.map((s) =>
                 segments.definitions[s.segment] ? (
                   <div key={s.segment} style={{ marginBottom: 6 }}>
-                    <b>{s.segment}:</b> {segments.definitions[s.segment]}
+                    <b>{s.segment}:</b> {unitSpelling(segments.definitions[s.segment])}
                   </div>
                 ) : null,
               )}

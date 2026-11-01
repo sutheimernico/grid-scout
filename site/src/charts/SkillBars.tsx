@@ -82,7 +82,7 @@ export function SkillBars({ segments, label, height = 190, labelEvery = 1, showV
               </rect>
               {showValues && (
                 <text x={x + barW / 2} y={(up ? top : top + Math.abs(y(value) - y(0))) + (up ? -6 : 14)} textAnchor="middle">
-                  {fmtNum(value, 0)}%
+                  {fmtNum(value, 1)}%
                 </text>
               )}
               {i % Math.max(labelEvery, Math.ceil(34 / slot)) === 0 && (
