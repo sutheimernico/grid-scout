@@ -103,18 +103,22 @@ export function spreadLabels(ys: number[], minGap: number, min: number, max: num
  *  too close to the previous tick (a series that begins late in a month) is
  *  skipped rather than overprinted. Ticks sit at real month starts, so the
  *  spacing reflects the calendar instead of a fixed day stride. */
-export function monthTickIndices(labels: string[], innerW: number, minGapPx = 64): number[] {
+export function monthTickIndices(labels: string[], innerW: number, minGapPx = 60): number[] {
   const n = labels.length;
   if (n === 0) return [];
-  const starts = labels.map((l, i) => (i === 0 || l !== labels[i - 1] ? i : -1)).filter((i) => i >= 0);
+  let starts = labels.map((l, i) => (i === 0 || l !== labels[i - 1] ? i : -1)).filter((i) => i >= 0);
   const px = (i: number) => (n <= 1 ? 0 : (i / (n - 1)) * innerW);
-  const out: number[] = [];
-  for (const i of starts) {
-    if (out.length === 0 || px(i) - px(out[out.length - 1]) >= minGapPx) out.push(i);
-  }
-  // thin evenly (every second, third ... month) until the labels fit
-  let stride = 1;
+  // a series that begins late in a month: that short first month would crowd the next label
+  if (
+    starts.length > 2 &&
+    starts[1] - starts[0] < 0.8 * (starts[2] - starts[1]) &&
+    px(starts[1]) - px(starts[0]) < minGapPx
+  )
+    starts = [starts[0], ...starts.slice(2)];
+  // then thin evenly (every second, third ... month) until every gap fits; never greedily,
+  // so the spacing stays regular
   const fits = (idx: number[]) => idx.every((v, k) => k === 0 || px(v) - px(idx[k - 1]) >= minGapPx);
-  while (stride < out.length && !fits(out.filter((_, k) => k % stride === 0))) stride += 1;
-  return out.filter((_, k) => k % stride === 0);
+  let stride = 1;
+  while (stride < starts.length && !fits(starts.filter((_, k) => k % stride === 0))) stride += 1;
+  return starts.filter((_, k) => k % stride === 0);
 }
