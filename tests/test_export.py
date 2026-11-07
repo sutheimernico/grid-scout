@@ -304,6 +304,19 @@ class TestAgentExport:
         assert out["generated_utc"].startswith("2026-10-28")
         assert out["holdout"]["pass_rate"] == 0.6
 
+    def test_counts_answers_the_regrade_flipped(self, tmp_path):
+        from gridscout.export import export_agent
+
+        report = self._report(9, 10)
+        assert export_agent(_write(tmp_path, report))["regraded"] == 0
+        report["results"][0] = {**report["results"][0], "passed": False, "regraded_fail": True}
+        assert export_agent(_write(tmp_path, report))["regraded"] == 1
+
+
+def _write(tmp_path, report):
+    (tmp_path / "agent_eval.json").write_text(json.dumps(report))
+    return tmp_path
+
 
 def test_forecast_export_carries_the_pre_auction_series(tmp_path):
     (tmp_path / "forecast_eval.json").write_text(json.dumps({"models": {}}))
