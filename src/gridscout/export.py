@@ -205,6 +205,7 @@ def export_agent(reports_dir: Path, examples_per_type: int = 2) -> dict:
         "generated_utc": report.get("generated_utc"),
         "n": report["n"],
         "pass_rate": report["pass_rate"],
+        "regraded": sum(bool(r.get("regraded_fail")) for r in report["results"]),
         "by_type": report["by_type"],
         "grading": report["grading"],
         "examples": examples,

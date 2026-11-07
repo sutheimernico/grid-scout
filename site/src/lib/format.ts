@@ -6,7 +6,9 @@ const TZ = "Europe/Berlin";
 export function fmtNum(v: number, digits = 0): string {
   // a tick at -0.0 or a value that rounds to zero must not print as "-0"
   if (Math.abs(v) < 0.5 * Math.pow(10, -digits)) v = 0;
-  return v.toLocaleString("en-GB", { minimumFractionDigits: digits, maximumFractionDigits: digits });
+  return v
+    .toLocaleString("en-GB", { minimumFractionDigits: digits, maximumFractionDigits: digits })
+    .replace("-", "\u2212");
 }
 
 /** Explicit sign, true minus sign for negatives. */
@@ -96,4 +98,12 @@ export function fmtPrice(v: number, digits = 1): string {
 /** The pipeline writes "EUR/MWh" in generated sentences; the page uses one spelling. */
 export function unitSpelling(text: string): string {
   return text.replace(/EUR\/MWh/g, "€/MWh").replace(/EUR\/MW\/yr/g, "€/MW/yr");
+}
+
+/** Pipeline- and model-written sentences, set in the page's conventions: ISO dates
+ *  as "25 Oct 2026", a real minus sign in front of numbers, one spelling of the units. */
+export function prettyText(text: string): string {
+  return unitSpelling(text)
+    .replace(/\b(\d{4})-(\d{2})-(\d{2})\b/g, (_, y, m, d) => fmtCalendarDate(`${y}-${m}-${d}`))
+    .replace(/(^|[\s(])-(?=\d)/g, "$1\u2212");
 }

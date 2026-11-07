@@ -20,29 +20,40 @@ const ROWS: { key: string; label: string; detail: string; kind: RowKind }[] = [
 ];
 
 /** Rows for the scoreboard ruler, worst error first so the model closes the
- *  ladder. Models the export does not carry are left out rather than guessed. */
+ *  ladder. Models the export does not carry are left out rather than guessed.
+ *
+ *  When the export has a pre-auction run, EVERY row comes from it: it covers
+ *  slightly fewer hours than the full-model run, and mixing the two would show
+ *  two different naive errors (30.62 vs 30.59) for the same baseline. */
 export function buildScoreboard(evalData: ForecastData["eval"]): ScoreRow[] {
-  const naive = evalData.models.naive_yesterday?.mae ?? null;
+  const preModels = evalData.pre_auction?.models;
+  // only a complete pre-auction run (baselines and both LightGBM runs) can carry the whole ruler
+  const pre = preModels?.naive_yesterday && preModels.lgbm_gate_closure ? preModels : undefined;
+  const src = (key: string, preKey: string = key) => (pre ? pre[preKey] : evalData.models[key]);
+  const naive = src("naive_yesterday")?.mae ?? null;
   const skill = (mae: number) => (naive == null || naive === 0 ? null : ((naive - mae) / naive) * 100);
   const rows: ScoreRow[] = [];
 
   for (const def of ROWS) {
-    const m = evalData.models[def.key];
-    if (m) rows.push({ ...def, mae: m.mae, rmse: m.rmse, skillVsNaive: skill(m.mae) });
+    const preKey = def.key === "ridge_per_hour" ? "ridge_pre_auction" : def.key;
+    const m = src(def.key, preKey);
+    if (!m) continue;
+    const detail = pre && def.key === "ridge_per_hour" ? "linear baseline, pre-auction inputs" : def.detail;
+    const label = pre && def.key === "ridge_per_hour" ? "Ridge, pre-auction inputs" : def.label;
+    rows.push({ ...def, label, detail, mae: m.mae, rmse: m.rmse, skillVsNaive: skill(m.mae) });
   }
-  const pre = evalData.pre_auction?.models.lgbm_pre_auction;
-  if (pre)
+  const honest = preModels?.lgbm_pre_auction;
+  if (honest)
     rows.push({
       key: "lgbm_pre_auction",
       label: "LightGBM, strictly pre-auction inputs",
       detail: "nothing dated on the delivery day",
       kind: "model",
-      mae: pre.mae,
-      rmse: pre.rmse,
-      // measured against the naive error of the same pre-auction run (its sample is slightly different)
-      skillVsNaive: evalData.pre_auction?.skill_vs_naive_pct ?? skill(pre.mae),
+      mae: honest.mae,
+      rmse: honest.rmse,
+      skillVsNaive: evalData.pre_auction?.skill_vs_naive_pct ?? skill(honest.mae),
     });
-  const main = evalData.models.lgbm_point;
+  const main = pre ? pre.lgbm_gate_closure : evalData.models.lgbm_point;
   if (main)
     rows.push({
       key: "lgbm_point",

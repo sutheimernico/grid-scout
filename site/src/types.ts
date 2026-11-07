@@ -70,6 +70,8 @@ export interface ForecastData {
     };
     /** same walk-forward on inputs published before the auction (absent in old exports) */
     pre_auction?: {
+      /** hours scored; slightly fewer than the full-model run (the first day has no pre-auction features) */
+      n?: number;
       skill_vs_naive_pct: number;
       models: Record<string, { mae: number; rmse: number }>;
     };
@@ -80,6 +82,8 @@ export interface ForecastData {
     timestamps: string[];
     actual: (number | null)[];
     predicted: (number | null)[];
+    /** strictly pre-auction model for the same hours; null in exports from before it was carried */
+    predicted_pre_auction?: (number | null)[] | null;
     q10: (number | null)[];
     q90: (number | null)[];
   };
@@ -113,7 +117,15 @@ export interface BatteryData {
     capture_rate_model: number;
     capture_rate_naive: number;
     model_edge_over_naive_eur: number;
+    model_edge_over_naive_eur_per_mw_year?: number;
     skipped_days: number;
+    /** which forecast the schedules use; absent in exports from before the pre-auction re-run */
+    forecast?: string;
+    /** the same battery scheduled on the full model, over the same days */
+    full_model?: {
+      capture_rate_model: number;
+      model_edge_over_naive_eur_per_mw_year: number;
+    };
   };
   daily: {
     days: string[];
@@ -130,6 +142,8 @@ export interface AgentData {
   /** questions written after the grader was tuned; never used for tuning */
   holdout?: { n: number; passed: number; pass_rate: number };
   n: number;
+  /** answers the self-contradiction gate flipped from pass to fail after the run */
+  regraded?: number;
   pass_rate: number;
   by_type: Record<string, { n: number; passed: number; pass_rate: number }>;
   grading: string;

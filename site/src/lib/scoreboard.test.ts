@@ -47,6 +47,29 @@ describe("buildScoreboard", () => {
     expect(rows.find((r) => r.key === "lgbm_pre_auction")!.skillVsNaive).toBe(17);
   });
 
+  it("takes every row from the pre-auction run so the naive error is one number", () => {
+    const withPre = {
+      ...base,
+      pre_auction: {
+        skill_vs_naive_pct: 17.6,
+        models: {
+          naive_yesterday: { mae: 30.62, rmse: 48 },
+          seasonal_naive_7d: { mae: 38.38, rmse: 58 },
+          ridge_pre_auction: { mae: 26.85, rmse: 40 },
+          lgbm_pre_auction: { mae: 25.24, rmse: 38 },
+          lgbm_gate_closure: { mae: 19.67, rmse: 31 },
+        },
+      },
+    };
+    const rows = buildScoreboard(withPre);
+    const mae = (k: string) => rows.find((r) => r.key === k)!.mae;
+    expect(mae("naive_yesterday")).toBe(30.62); // not the full run's 30
+    expect(mae("ridge_per_hour")).toBe(26.85); // the ridge that sees the same inputs
+    expect(mae("lgbm_point")).toBe(19.67);
+    expect(rows.find((r) => r.key === "lgbm_point")!.skillVsNaive).toBeCloseTo(35.8, 1);
+    expect(rows.find((r) => r.key === "ridge_per_hour")!.label).toMatch(/pre-auction/);
+  });
+
   it("drops rows the export does not carry instead of inventing them", () => {
     const { ridge_per_hour: _r, ...models } = base.models;
     expect(buildScoreboard({ ...base, models }).map((r) => r.key)).not.toContain("ridge_per_hour");

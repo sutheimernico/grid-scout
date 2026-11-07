@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bandPath, extent, linePath, linearScale, spreadLabels, ticks } from "./scale";
+import { bandPath, extent, linePath, linearScale, monthTickIndices, spreadLabels, ticks } from "./scale";
 
 describe("linearScale", () => {
   it("maps domain to range linearly", () => {
@@ -97,5 +97,28 @@ describe("spreadLabels", () => {
     const out = spreadLabels([98, 99], 14, 0, 100);
     expect(Math.max(...out)).toBeLessThanOrEqual(100);
     expect(out[1] - out[0]).toBeGreaterThanOrEqual(14);
+  });
+});
+
+describe("monthTickIndices", () => {
+  const days = (months: [string, number][]) => months.flatMap(([m, n]) => Array(n).fill(m) as string[]);
+  it("ticks sit on the first day of each month", () => {
+    const labels = days([["Nov", 30], ["Dec", 31], ["Jan", 31]]);
+    expect(monthTickIndices(labels, 920)).toEqual([0, 30, 61]);
+  });
+  it("skips a month that starts right after the series does", () => {
+    const labels = days([["Oct", 5], ["Nov", 30], ["Dec", 31]]);
+    expect(monthTickIndices(labels, 600)).toEqual([0, 35]);
+  });
+  it("thins evenly when the width cannot hold every month", () => {
+    const labels = days(Array.from({ length: 12 }, (_, i) => [`M${i}`, 30] as [string, number]));
+    const idx = monthTickIndices(labels, 300, 64);
+    expect(idx[0]).toBe(0);
+    const gaps = idx.slice(1).map((v, k) => v - idx[k]);
+    expect(new Set(gaps).size).toBe(1);
+    expect(idx.length).toBeLessThanOrEqual(5);
+  });
+  it("copes with no labels", () => {
+    expect(monthTickIndices([], 300)).toEqual([]);
   });
 });

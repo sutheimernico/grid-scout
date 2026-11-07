@@ -97,3 +97,24 @@ export function spreadLabels(ys: number[], minGap: number, min: number, max: num
   }
   return out;
 }
+
+/** Tick indices for a series labelled by month: the first point of each month,
+ *  thinned so labels at least `minGapPx` apart stay readable. A month that starts
+ *  too close to the previous tick (a series that begins late in a month) is
+ *  skipped rather than overprinted. Ticks sit at real month starts, so the
+ *  spacing reflects the calendar instead of a fixed day stride. */
+export function monthTickIndices(labels: string[], innerW: number, minGapPx = 64): number[] {
+  const n = labels.length;
+  if (n === 0) return [];
+  const starts = labels.map((l, i) => (i === 0 || l !== labels[i - 1] ? i : -1)).filter((i) => i >= 0);
+  const px = (i: number) => (n <= 1 ? 0 : (i / (n - 1)) * innerW);
+  const out: number[] = [];
+  for (const i of starts) {
+    if (out.length === 0 || px(i) - px(out[out.length - 1]) >= minGapPx) out.push(i);
+  }
+  // thin evenly (every second, third ... month) until the labels fit
+  let stride = 1;
+  const fits = (idx: number[]) => idx.every((v, k) => k === 0 || px(v) - px(idx[k - 1]) >= minGapPx);
+  while (stride < out.length && !fits(out.filter((_, k) => k % stride === 0))) stride += 1;
+  return out.filter((_, k) => k % stride === 0);
+}

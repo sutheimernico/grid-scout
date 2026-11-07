@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fmtPrice, unitSpelling, fmtCalendarDate, fmtDateTime, fmtHourLabel, fmtMonthYear, fmtNum, fmtPct, fmtSigned, localParts } from "./format";
+import { fmtPrice, prettyText, unitSpelling, fmtCalendarDate, fmtDateTime, fmtHourLabel, fmtMonthYear, fmtNum, fmtPct, fmtSigned, localParts } from "./format";
 
 describe("fmtNum", () => {
   it("groups thousands and fixes decimals", () => {
@@ -69,5 +69,22 @@ describe("fmtPrice", () => {
 describe("unitSpelling", () => {
   it("uses one unit spelling", () => {
     expect(unitSpelling("low of -4.99 EUR/MWh and 100 EUR/MW/yr")).toBe("low of -4.99 €/MWh and 100 €/MW/yr");
+  });
+});
+
+describe("prettyText", () => {
+  it("sets generated sentences in the page's conventions", () => {
+    const out = prettyText("2026-10-25: cheapest hour 03:00 at -0.01 EUR/MWh with 0.0 GW of solar and -0.6 GW residual load");
+    expect(out).toBe("25 Oct 2026: cheapest hour 03:00 at \u22120.01 €/MWh with 0.0 GW of solar and \u22120.6 GW residual load");
+  });
+  it("does not touch hyphens inside words or dates it cannot read", () => {
+    expect(prettyText("day-ahead and walk-forward, 10-20 MW")).toBe("day-ahead and walk-forward, 10-20 MW");
+  });
+});
+
+describe("fmtNum negatives", () => {
+  it("uses a real minus sign on axes too", () => {
+    expect(fmtNum(-50)).toBe("\u221250");
+    expect(fmtNum(-1234.5, 1)).toBe("\u22121,234.5");
   });
 });
