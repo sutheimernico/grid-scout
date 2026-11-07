@@ -214,6 +214,10 @@ class TestSelfContradiction:
         "answer",
         [
             "The minimum was 120.0 EUR/MWh and the peak was 90.0 EUR/MWh.",
+            (
+                "The lowest price, 300.10 EUR/MWh at 23:00, was above the highest, "
+                "12.50 EUR/MWh at 08:00."
+            ),
             "The mean was greater than the highest price of the day.",
         ],
     )
@@ -223,6 +227,19 @@ class TestSelfContradiction:
     @pytest.mark.parametrize(
         "answer",
         [
+            # the hour comes first and must not be read as the price
+            (
+                "The lowest price was at 23:00 with 12.50 EUR/MWh and the highest at 08:00 "
+                "with 300.10 EUR/MWh."
+            ),
+            (
+                "Highest at 08:00 (300.10 EUR/MWh), lowest at 23:00 (12.50 \u20ac/MWh); "
+                "the average was 120.30 EUR/MWh."
+            ),
+            (
+                "The average of 120 EUR/MWh sat between the minimum of 12.5 EUR/MWh "
+                "and the maximum of 300.1 EUR/MWh."
+            ),
             "The average was 59.5 EUR/MWh, between a low of -5.0 and a peak of 135.8.",
             "Minimum 10.0 EUR/MWh at 03:00, maximum 135.8 EUR/MWh at 19:00.",
             "The average price was lower than yesterday's.",

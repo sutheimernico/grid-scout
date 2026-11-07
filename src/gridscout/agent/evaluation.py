@@ -69,20 +69,32 @@ def numeric_match(answer: str, gold: float, rel_tol: float = 0.02, abs_tol: floa
     return any(abs(n - gold) <= max(abs_tol, abs(gold) * rel_tol) for n in extract_numbers(answer))
 
 
+_AVG = r"(?:average|mean)"
+_THAN = r"\bthan\s+(?:the\s+)?(?:day'?s?\s+)?(?:\w+\s+)?"
 _ABOVE_PEAK = re.compile(
-    r"(average|mean)[^.]*?\b(higher|above|greater|more)\b[^.]*?\bthan\b[^.]*?"
-    r"\b(peak|maximum|highest|max)\b",
+    rf"\b{_AVG}\b[^.]*?\b(?:higher|above|greater|more)\b[^.]*?{_THAN}(?:peak|maximum|highest|max)\b",
     re.IGNORECASE,
 )
 _BELOW_MIN = re.compile(
-    r"(average|mean)?[^.]*?\b(lower|below|less|under)\b[^.]*?\bthan\b[^.]*?"
-    r"\b(minimum|lowest|min)\b",
+    rf"\b{_AVG}\b[^.]*?\b(?:lower|below|less|under)\b[^.]*?{_THAN}(?:minimum|lowest|min)\b",
     re.IGNORECASE,
 )
-_MIN_NUM = re.compile(r"\b(?:minimum|lowest|min)\b[^.\d-]{0,40}(-?\d[\d,]*\.?\d*)", re.IGNORECASE)
-_MAX_NUM = re.compile(
-    r"\b(?:maximum|highest|peak|max)\b[^.\d-]{0,40}(-?\d[\d,]*\.?\d*)", re.IGNORECASE
-)
+_MIN_WORD = re.compile(r"\b(?:minimum|lowest|min)\b", re.IGNORECASE)
+_MAX_WORD = re.compile(r"\b(?:maximum|highest|peak|max)\b", re.IGNORECASE)
+# only a number with a price unit counts: "at 23:00" names an hour, not a price
+_PRICE = re.compile(r"(-?\d[\d,]*(?:\.\d+)?)\s*(?:EUR|\u20ac)\s*/\s*MWh", re.IGNORECASE)
+_REACH = 70  # characters after the keyword in which its price must appear
+
+
+def _price_after(answer: str, keyword: re.Match) -> float | None:
+    for price in _PRICE.finditer(answer, keyword.end()):
+        if price.start() - keyword.end() > _REACH:
+            return None
+        try:
+            return float(price.group(1).replace(",", ""))
+        except ValueError:
+            return None
+    return None
 
 
 def self_contradictory(answer: str) -> bool:
@@ -91,21 +103,15 @@ def self_contradictory(answer: str) -> bool:
     The numeric grader only looks for the gold number, so an answer with the
     right mean and nonsense prose around it (an average "higher than the peak",
     a minimum above the maximum) used to pass. This is a mechanical check, not
-    a judge: it catches those two shapes and nothing else.
+    a judge: it catches those shapes and nothing else. A number counts as a
+    price only with its unit, so hours ("lowest at 23:00") are never mistaken
+    for one.
     """
-    if _ABOVE_PEAK.search(answer) or (
-        re.search(r"\b(average|mean)\b", answer, re.IGNORECASE) and _BELOW_MIN.search(answer)
-    ):
+    if _ABOVE_PEAK.search(answer) or _BELOW_MIN.search(answer):
         return True
-    lo, hi = _MIN_NUM.search(answer), _MAX_NUM.search(answer)
-    if lo and hi:
-        try:
-            return float(lo.group(1).replace(",", "").rstrip(".")) > float(
-                hi.group(1).replace(",", "").rstrip(".")
-            )
-        except ValueError:
-            return False
-    return False
+    lows = [v for m in _MIN_WORD.finditer(answer) if (v := _price_after(answer, m)) is not None]
+    highs = [v for m in _MAX_WORD.finditer(answer) if (v := _price_after(answer, m)) is not None]
+    return bool(lows and highs and min(highs) < max(lows))
 
 
 def refusal_like(answer: str) -> bool:
