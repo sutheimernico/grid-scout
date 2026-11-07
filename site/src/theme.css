@@ -255,6 +255,54 @@ section[id] {
 .hero-head .lede {
   padding-bottom: 6px;
 }
+.nb {
+  white-space: nowrap;
+}
+.hero-figure {
+  margin-bottom: 18px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--hair);
+}
+.hero-figure .num {
+  font-size: clamp(44px, 5.2vw, 68px);
+  font-weight: 800;
+  font-stretch: 118%;
+  line-height: 1;
+  color: var(--volt);
+}
+.hero-figure .num small {
+  font-size: 0.5em;
+  margin-left: 2px;
+}
+.hero-figure p {
+  margin-top: 8px;
+  font-size: 15px;
+  color: var(--ink-2);
+  max-width: 44ch;
+}
+/* Nico's laptop: 960 x 540. Keep the headline block short enough that the
+   legend and the top of the chart share the first screen. */
+@media (min-width: 901px) and (max-height: 640px) {
+  .hero {
+    padding-block: 28px 40px;
+  }
+  h1 {
+    font-size: clamp(30px, 3.2vw, 44px);
+  }
+  .hero-head {
+    align-items: start;
+  }
+  .hero-head .lede {
+    font-size: 15.5px;
+  }
+  .hero-figure {
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+  }
+  .hero-figure .num {
+    font-size: 44px;
+  }
+}
 .hero-meta {
   margin-top: 18px;
   font-size: 14px;
@@ -881,6 +929,45 @@ table.data-table td.neg {
   color: #f1f3f2;
   font-weight: 600;
   margin-bottom: 2px;
+}
+/* The sequence builds in order: each step's rail draws, then its dot lands. */
+.reveal-js .protocol li::before {
+  transform: scaleX(0);
+  transform-origin: left center;
+}
+.reveal-js .protocol li::after {
+  transform: scale(0);
+}
+.reveal-js .is-in .protocol li::before {
+  animation: growx 320ms var(--ease) forwards;
+  animation-delay: calc(var(--step, 0) * 220ms);
+}
+.reveal-js .is-in .protocol li::after {
+  animation: dot 220ms var(--ease) forwards;
+  animation-delay: calc(var(--step, 0) * 220ms + 160ms);
+}
+.protocol li:nth-child(2) {
+  --step: 1;
+}
+.protocol li:nth-child(3) {
+  --step: 2;
+}
+.protocol li:nth-child(4) {
+  --step: 3;
+}
+@keyframes dot {
+  to {
+    transform: scale(1);
+  }
+}
+@media (max-width: 760px) {
+  .reveal-js .protocol li::before {
+    transform: scaleY(0);
+    transform-origin: top center;
+  }
+  .reveal-js .is-in .protocol li::before {
+    animation-name: growy;
+  }
 }
 @media (max-width: 760px) {
   .protocol {
