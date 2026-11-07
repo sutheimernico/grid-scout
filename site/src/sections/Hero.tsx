@@ -2,8 +2,9 @@ import { useEffect, useState } from "react";
 import { HeroChart } from "../charts/HeroChart";
 import { LineChart } from "../charts/LineChart";
 import { fmtCalendarDate, fmtDateTime, fmtHourLabel, fmtNum } from "../lib/format";
+import { headlineFigure } from "../lib/headline";
 import { hasRecordedForecasts, lastScoredDay, liveTomorrow } from "../lib/live";
-import { Reveal } from "../ui";
+import { CountUp, Reveal } from "../ui";
 import type { Loadable } from "../lib/useData";
 import { pickHeroWindow } from "../lib/hero";
 import type { ForecastData, ForwardLedgerData, HealthData } from "../types";
@@ -64,6 +65,7 @@ export function Hero({
   const led = ledger.state === "ready" ? ledger.data : null;
   const tomorrow = liveTomorrow(led);
   const recording = hasRecordedForecasts(led);
+  const figure = ready ? headlineFigure(ready.eval) : null;
 
   return (
     <section className="hero" id="top" aria-label="Forecast against cleared prices">
@@ -72,19 +74,33 @@ export function Hero({
           {tomorrow ? (
             <h1>Tomorrow&apos;s German power price, forecast before the auction closes.</h1>
           ) : (
-            <h1>Germany&apos;s day-ahead power price, forecast hour by hour and scored against what cleared.</h1>
+            <h1>
+              Germany&apos;s <span className="nb">day-ahead</span> power price, forecast hour by hour and scored against
+              what cleared.
+            </h1>
           )}
           <div>
+            {figure && (
+              <Reveal className="hero-figure">
+                <div className="num">
+                  <CountUp value={figure.pct} digits={1} active delayMs={250} />
+                  <small>%</small>
+                </div>
+                <p>
+                  less error than yesterday&apos;s prices, using only what exists before the auction: MAE{" "}
+                  {fmtNum(figure.mae, 2)} against {fmtNum(figure.naiveMae, 2)} €/MWh, out-of-sample.
+                </p>
+              </Reveal>
+            )}
             <p className="lede">
-              Hourly day-ahead price forecasts from a LightGBM model
+              A LightGBM forecast
               {ready && nHours
                 ? `, validated walk-forward over ${ready.eval.eval_period.n_days} days (${fmtNum(nHours)} out-of-sample hours)`
                 : ""}
-              , compared with naive and linear baselines.{" "}
+              , against naive and linear baselines.{" "}
               {recording
                 ? "A forward ledger records every forecast before the auction closes and scores it afterwards."
                 : "A forward ledger that records each forecast before the auction closes, and scores it afterwards, starts with the first daily run."}{" "}
-              It runs on GitHub Actions alone, with no server.
             </p>
             {health.state === "ready" && (
               <p className="hero-meta">

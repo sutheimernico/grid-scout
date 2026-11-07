@@ -47,7 +47,7 @@ export function buildScoreboard(evalData: ForecastData["eval"]): ScoreRow[] {
     rows.push({
       key: "lgbm_point",
       label: "LightGBM, with the TSOs' generation forecast",
-      detail: "assumed known at gate closure",
+      detail: "uses data SMARD publishes after the auction",
       kind: "model",
       mae: main.mae,
       rmse: main.rmse,

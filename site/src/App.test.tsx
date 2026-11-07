@@ -607,6 +607,36 @@ describe("honest headline", () => {
     expect(screen.getByRole("heading", { level: 2, name: /17\.6% less error than yesterday's prices, on public pre-auction data/ })).toBeTruthy();
     expect(screen.getByText(/battery backtest below all use the second/)).toBeTruthy();
   });
+
+  it("opens with the pre-auction figure in the hero and highlights that ruler row, not the full model", () => {
+    setAll("missing");
+    artifacts.set("forecast.json", {
+      state: "ready",
+      data: {
+        ...forecast,
+        eval: {
+          ...forecast.eval,
+          pre_auction: {
+            skill_vs_naive_pct: 17.6,
+            models: { lgbm_pre_auction: { mae: 25.24, rmse: 38 }, naive_yesterday: { mae: 30.62, rmse: 47 } },
+          },
+        },
+      },
+    });
+    const { container } = render(<App />);
+    const figure = container.querySelector(".hero-figure") as HTMLElement;
+    expect(figure.textContent).toMatch(/17\.6%/);
+    expect(figure.textContent).toMatch(/MAE 25\.24 against 30\.62/);
+    const hero = container.querySelector(".ruler-row.hero-row") as HTMLElement;
+    expect(hero.textContent).toMatch(/strictly pre-auction/);
+  });
+
+  it("says nothing was recorded while the ledger is empty, never that it is recorded every morning", () => {
+    setAll("missing");
+    render(<App />);
+    expect(screen.getByText(/Nothing has been recorded yet/)).toBeTruthy();
+    expect(screen.queryByText(/every morning the pipeline records/)).toBeNull();
+  });
 });
 
 describe("ledger section", () => {

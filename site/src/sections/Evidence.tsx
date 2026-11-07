@@ -22,7 +22,6 @@ export function Evidence({ data }: { data: ForecastData }) {
                 ? `${fmtNum(pre.skill_vs_naive_pct, 1)}% less error than yesterday's prices, on public pre-auction data`
                 : `${fmtNum(ev.skill.lgbm_vs_naive_pct, 1)}% less error than copying yesterday's prices`}
             </h2>
-            <p className="note">{unitSpelling(ev.finding)}</p>
             <p className="note">
               {pre
                 ? `Two models, two answers: ${fmtNum(pre.skill_vs_naive_pct, 1)}% with inputs published before the auction, ${fmtNum(ev.skill.lgbm_vs_naive_pct, 1)}% when the TSOs' generation forecast for the delivery day is assumed known, as it is for a trader with TSO feeds. `
@@ -31,6 +30,7 @@ export function Evidence({ data }: { data: ForecastData }) {
               full model; the battery backtest has not been re-run on pre-auction forecasts. Every number is
               out-of-sample: expanding walk-forward over a full year, refit weekly.
             </p>
+            <p className="note">{unitSpelling(ev.finding)}</p>
           </Reveal>
           <Reveal>
             <Scoreboard rows={rows} />

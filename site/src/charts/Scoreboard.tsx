@@ -11,7 +11,8 @@ export function Scoreboard({ rows }: { rows: ScoreRow[] }) {
   const max = rulerMax(rows);
   const marks = Array.from({ length: max / 10 + 1 }, (_, i) => i * 10);
   const pct = (v: number) => `${(v / max) * 100}%`;
-  const lastModel = rows.length - 1;
+  // The honest model leads: the full model needs data SMARD publishes after the auction.
+  const heroKey = rows.find((r) => r.key === "lgbm_pre_auction")?.key ?? rows.filter((r) => r.kind === "model").at(-1)?.key;
 
   return (
     <div className={`ruler ${seen ? "is-in" : ""}`} ref={ref} role="table" aria-label="Mean absolute error per model, EUR per MWh, lower is better">
@@ -24,7 +25,7 @@ export function Scoreboard({ rows }: { rows: ScoreRow[] }) {
         ))}
       </div>
       {rows.map((r, i) => {
-        const isHero = i === lastModel && r.kind === "model";
+        const isHero = r.key === heroKey;
         return (
           <div className={`ruler-row ${r.kind} ${isHero ? "hero-row" : ""}`} key={r.key} role="row">
             <div className="name" role="rowheader">
