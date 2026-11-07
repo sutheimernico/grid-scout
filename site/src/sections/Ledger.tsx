@@ -59,7 +59,7 @@ export function Ledger({ ledger }: { ledger: Loadable<ForwardLedgerData> }) {
             <p className="lede" style={{ color: "var(--ink-2)" }}>
               {data
                 ? data.method
-                : "A backtest can be re-run until it looks good. This cannot: every morning the pipeline records tomorrow's forecast, and the cleared prices score it afterwards."}
+                : "A backtest can be re-run until it looks good. This cannot: the pipeline is set up to record tomorrow's forecast each morning before the auction, and the cleared prices score it afterwards. Nothing has been recorded yet."}
             </p>
           </Reveal>
         </div>

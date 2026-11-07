@@ -24,6 +24,9 @@ export function Battery({ data }: { data: BatteryData }) {
               {fmtSigned(split.edge)}
               <small>€ a year</small>
             </div>
+            <p className="small" style={{ marginTop: 10 }}>
+              Full model: assumes the TSOs&apos; generation forecast for the delivery day is known.
+            </p>
             <h2 style={{ marginTop: 18, maxWidth: "26ch" }}>
               Most of the revenue is the battery, not the forecast
             </h2>
