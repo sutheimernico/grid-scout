@@ -1,13 +1,14 @@
 {
+  "generated_utc": "2026-11-07T01:31:19+00:00",
   "model": "qwen2.5:7b",
   "n": 28,
-  "passed": 27,
-  "pass_rate": 0.964,
+  "passed": 26,
+  "pass_rate": 0.929,
   "by_type": {
     "factual": {
       "n": 12,
-      "passed": 12,
-      "pass_rate": 1.0
+      "passed": 11,
+      "pass_rate": 0.917
     },
     "analytical": {
       "n": 2,
@@ -25,7 +26,7 @@
       "pass_rate": 0.875
     }
   },
-  "grading": "programmatic (numeric tolerance / refusal heuristics), no LLM judge",
+  "grading": "programmatic (numeric tolerance / refusal heuristics, plus a check that the answer does not contradict itself), no LLM judge",
   "results": [
     {
       "id": "price-mean-0",
@@ -78,8 +79,9 @@
         }
       ],
       "rounds": 2,
-      "passed": true,
-      "agent_error": null
+      "passed": false,
+      "agent_error": null,
+      "regraded_fail": true
     },
     {
       "id": "price-max-1",

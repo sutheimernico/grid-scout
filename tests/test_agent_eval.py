@@ -1,7 +1,13 @@
 import httpx
 import pytest
 
-from gridscout.agent.evaluation import extract_numbers, numeric_match, refusal_like
+from gridscout.agent.evaluation import (
+    extract_numbers,
+    numeric_match,
+    refusal_like,
+    regrade,
+    self_contradictory,
+)
 from gridscout.agent.loop import GridAgent
 from gridscout.agent.tools import GridTools
 
@@ -192,3 +198,54 @@ class TestHoldoutSet:
         for q in build_holdout_set(long_tools):
             if q.type != "trap":
                 assert q.grade(q.gold_display), q.id
+
+
+class TestSelfContradiction:
+    def test_the_real_answer_that_passed_the_number_check_is_caught(self):
+        answer = (
+            "207.84 EUR/MWh. The average price was slightly higher than the peak price of "
+            "665.82 EUR/MWh in the evening and lower than the minimum price of 70.98 "
+            "EUR/MWh during midday."
+        )
+        assert numeric_match(answer, 207.84)
+        assert self_contradictory(answer)
+
+    @pytest.mark.parametrize(
+        "answer",
+        [
+            "The minimum was 120.0 EUR/MWh and the peak was 90.0 EUR/MWh.",
+            "The mean was greater than the highest price of the day.",
+        ],
+    )
+    def test_impossible_statements(self, answer):
+        assert self_contradictory(answer)
+
+    @pytest.mark.parametrize(
+        "answer",
+        [
+            "The average was 59.5 EUR/MWh, between a low of -5.0 and a peak of 135.8.",
+            "Minimum 10.0 EUR/MWh at 03:00, maximum 135.8 EUR/MWh at 19:00.",
+            "The average price was lower than yesterday's.",
+            "No data for that date.",
+        ],
+    )
+    def test_ordinary_answers_pass(self, answer):
+        assert not self_contradictory(answer)
+
+    def test_regrade_flips_only_the_contradictory_pass_and_recounts(self):
+        bad = "The average was higher than the peak of 5 EUR/MWh."
+        report = {
+            "model": "m",
+            "generated_utc": "2026-01-01T00:00:00+00:00",
+            "results": [
+                {"id": "a", "type": "factual", "answer": bad, "passed": True},
+                {"id": "b", "type": "factual", "answer": "ok 5", "passed": True},
+                {"id": "c", "type": "trap", "answer": "no data", "passed": False},
+            ],
+        }
+        out = regrade(report)
+        assert (out["n"], out["passed"]) == (3, 1)
+        assert out["by_type"]["factual"] == {"n": 2, "passed": 1, "pass_rate": 0.5}
+        assert out["results"][0]["regraded_fail"] is True
+        assert "regraded_fail" not in out["results"][1]
+        assert out["generated_utc"] == "2026-01-01T00:00:00+00:00"

@@ -69,6 +69,45 @@ def numeric_match(answer: str, gold: float, rel_tol: float = 0.02, abs_tol: floa
     return any(abs(n - gold) <= max(abs_tol, abs(gold) * rel_tol) for n in extract_numbers(answer))
 
 
+_ABOVE_PEAK = re.compile(
+    r"(average|mean)[^.]*?\b(higher|above|greater|more)\b[^.]*?\bthan\b[^.]*?"
+    r"\b(peak|maximum|highest|max)\b",
+    re.IGNORECASE,
+)
+_BELOW_MIN = re.compile(
+    r"(average|mean)?[^.]*?\b(lower|below|less|under)\b[^.]*?\bthan\b[^.]*?"
+    r"\b(minimum|lowest|min)\b",
+    re.IGNORECASE,
+)
+_MIN_NUM = re.compile(r"\b(?:minimum|lowest|min)\b[^.\d-]{0,40}(-?\d[\d,]*\.?\d*)", re.IGNORECASE)
+_MAX_NUM = re.compile(
+    r"\b(?:maximum|highest|peak|max)\b[^.\d-]{0,40}(-?\d[\d,]*\.?\d*)", re.IGNORECASE
+)
+
+
+def self_contradictory(answer: str) -> bool:
+    """True when the answer states something no mean/min/max triple can satisfy.
+
+    The numeric grader only looks for the gold number, so an answer with the
+    right mean and nonsense prose around it (an average "higher than the peak",
+    a minimum above the maximum) used to pass. This is a mechanical check, not
+    a judge: it catches those two shapes and nothing else.
+    """
+    if _ABOVE_PEAK.search(answer) or (
+        re.search(r"\b(average|mean)\b", answer, re.IGNORECASE) and _BELOW_MIN.search(answer)
+    ):
+        return True
+    lo, hi = _MIN_NUM.search(answer), _MAX_NUM.search(answer)
+    if lo and hi:
+        try:
+            return float(lo.group(1).replace(",", "").rstrip(".")) > float(
+                hi.group(1).replace(",", "").rstrip(".")
+            )
+        except ValueError:
+            return False
+    return False
+
+
 def refusal_like(answer: str) -> bool:
     lowered = answer.lower()
     return any(marker in lowered for marker in REFUSAL_MARKERS)
@@ -418,7 +457,12 @@ def run_eval(
     results = []
     for q in questions:
         res = agent.ask(q.text)
-        passed = bool(res.answer) and res.error is None and q.grade(res.answer)
+        passed = (
+            bool(res.answer)
+            and res.error is None
+            and q.grade(res.answer)
+            and not self_contradictory(res.answer)
+        )
         results.append(
             {
                 "id": q.id,
@@ -433,23 +477,51 @@ def run_eval(
             }
         )
 
+    report = _summarise(results, agent.model)
+    reports_dir.mkdir(parents=True, exist_ok=True)
+    (reports_dir / filename).write_text(json.dumps(report, indent=2) + "\n")
+    return report
+
+
+def regrade(report: dict) -> dict:
+    """Re-apply the self-contradiction gate to a stored report, offline.
+
+    The stored answers are the agent's real output, so no LLM call is needed:
+    only the grading changes. Cases the gate flips are marked `regraded_fail`.
+    """
+    results = []
+    for r in report["results"]:
+        flipped = r["passed"] and self_contradictory(r["answer"] or "")
+        results.append(
+            {
+                **r,
+                "passed": r["passed"] and not flipped,
+                **({"regraded_fail": True} if flipped else {}),
+            }
+        )
+    out = _summarise(results, report["model"])
+    out["generated_utc"] = report.get("generated_utc", out["generated_utc"])
+    return out
+
+
+def _summarise(results: list[dict], model: str) -> dict:
     by_type: dict[str, dict] = {}
     for r in results:
         bucket = by_type.setdefault(r["type"], {"n": 0, "passed": 0})
         bucket["n"] += 1
         bucket["passed"] += int(r["passed"])
-    report = {
+    return {
         "generated_utc": datetime.now(UTC).isoformat(timespec="seconds"),
-        "model": agent.model,
+        "model": model,
         "n": len(results),
         "passed": sum(r["passed"] for r in results),
         "pass_rate": round(sum(r["passed"] for r in results) / len(results), 3),
         "by_type": {
             k: {**v, "pass_rate": round(v["passed"] / v["n"], 3)} for k, v in by_type.items()
         },
-        "grading": "programmatic (numeric tolerance / refusal heuristics), no LLM judge",
+        "grading": (
+            "programmatic (numeric tolerance / refusal heuristics, plus a check that the "
+            "answer does not contradict itself), no LLM judge"
+        ),
         "results": results,
     }
-    reports_dir.mkdir(parents=True, exist_ok=True)
-    (reports_dir / filename).write_text(json.dumps(report, indent=2) + "\n")
-    return report
