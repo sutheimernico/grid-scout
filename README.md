@@ -102,8 +102,8 @@ Honesty guarantees behind those numbers:
   auction-time snapshot.
 - **Known gap in the pre-auction run.** It scores 8,737 of the 8,761 evaluated
   hours: 2026-10-25 has no pre-auction forecast, because SMARD's generation
-  forecast series (solar, onshore wind, total) have a 24-hour hole on 2026-10-24
-  and the model's one-day-lag features need it. Rows with missing inputs are
+  forecast series have 24-hour holes (solar and onshore wind on 2026-10-24, the
+  total on 23 and 24 Oct) and the model's one-day-lag features need that data. Rows with missing inputs are
   dropped, never imputed, so every model in the table above is compared on the same
   8,737 hours; the hero chart skips that day.
 - **Baselines first.** Naive, seasonal-naive and a per-hour ridge regression

@@ -53,8 +53,9 @@ def frames_from_predictions(
     after the auction), "pred_point_pre_auction" the one that only sees what
     exists at 12:00. Hours without a forecast are dropped, so run_backtest skips and
     counts those days. In the committed run that is 2026-10-25 for the pre-auction
-    model: SMARD's generation-forecast series have a 24-hour hole on 2026-10-24
-    and the model's one-day-lag features need it (see forecast/evaluate.py).
+    model: SMARD's generation-forecast series have 24-hour holes on 2026-10-24
+    (the total also on 23 Oct) and the model's one-day-lag features need it
+    (see forecast/evaluate.py).
     """
     frame = predictions.assign(local_day=pd.to_datetime(predictions["local_day"]).dt.date)
     actual = frame.rename(columns={"target": "price"})[["local_day", "hour_local", "price"]]

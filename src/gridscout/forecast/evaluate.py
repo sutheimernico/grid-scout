@@ -71,8 +71,8 @@ def evaluate(data_dir: Path, config: EvalConfig | None = None) -> tuple[dict, pd
     # Known gap: a delivery day whose lagged inputs are missing has no pre-auction
     # forecast (rows with missing features are dropped, nothing is imputed). In the
     # committed run that is 2026-10-25 (24 of 8,761 hours): SMARD's generation
-    # forecast series have a 24-hour hole on 2026-10-24, and the day-D lag-1 features
-    # need it. It is a hole in the source, not the DST change of that day.
+    # forecast series have 24-hour holes (solar, onshore wind: 2026-10-24; total: 23-24
+    # Oct), and the lag-1 features need it. It is a hole in the source, not the DST change of that day.
     pre_matrix = build_matrix(raw, features=PRE_AUCTION)
     pre_models = [LightGBMPrice(seed=config.seed), RidgePerHour()]
     pre_results = {m.name: run_walkforward(pre_matrix, m, folds) for m in pre_models}
