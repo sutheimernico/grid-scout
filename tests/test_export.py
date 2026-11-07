@@ -7,7 +7,13 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from gridscout.export import export_battery, export_health, export_market, export_site_data
+from gridscout.export import (
+    export_battery,
+    export_forecast,
+    export_health,
+    export_market,
+    export_site_data,
+)
 from gridscout.smard.filters import SERIES
 from tests.conftest import HOUR_MS
 
@@ -297,3 +303,26 @@ class TestAgentExport:
         out = export_agent(tmp_path)
         assert out["generated_utc"].startswith("2026-10-28")
         assert out["holdout"]["pass_rate"] == 0.6
+
+
+def test_forecast_export_carries_the_pre_auction_series(tmp_path):
+    (tmp_path / "forecast_eval.json").write_text(json.dumps({"models": {}}))
+    base = {
+        "local_day": ["2026-01-01"] * 2,
+        "hour_local": [0, 1],
+        "target": [1.0, 2.0],
+        "pred_naive": [1.0, 1.0],
+        "pred_snaive7": [1.0, 1.0],
+        "pred_point": [1.5, 2.5],
+        "pred_q10": [0.0, 1.0],
+        "pred_q90": [3.0, 4.0],
+    }
+    hours = pd.date_range("2026-01-01", periods=2, freq="h", tz="UTC")
+    pd.DataFrame({**base, "pred_point_pre_auction": [np.nan, 2.25]}, index=hours).to_parquet(
+        tmp_path / "predictions.parquet"
+    )
+    recent = export_forecast(tmp_path)["recent"]
+    assert recent["predicted_pre_auction"] == [None, 2.25]
+    assert recent["predicted"] == [1.5, 2.5]
+    pd.DataFrame(base, index=hours).to_parquet(tmp_path / "predictions.parquet")  # older export
+    assert export_forecast(tmp_path)["recent"]["predicted_pre_auction"] is None

@@ -143,6 +143,12 @@ def export_forecast(reports_dir: Path, days: int = 28) -> dict:
             "timestamps": [t.isoformat() for t in tail.index],
             "actual": _values(tail["target"]),
             "predicted": _values(tail["pred_point"]),
+            # strictly pre-auction model; null for the one day it has no features for
+            "predicted_pre_auction": (
+                _values(tail["pred_point_pre_auction"])
+                if "pred_point_pre_auction" in tail
+                else None
+            ),
             "q10": _values(tail["pred_q10"]),
             "q90": _values(tail["pred_q90"]),
         },
