@@ -54,6 +54,9 @@ def test_table_carries_every_baseline_the_date_and_both_coverages(reports):
     for expected in ("2026-10-28", "30.00", "38.00", "22.50", "19.50", "25.00", "62%", "75%"):
         assert expected in text
     assert "80,000" in text
+    assert text.index("25.00") < text.index("19.50")  # honest pre-auction model first
+    assert "+4,000 €/yr" in text
+    assert "not been re-run on pre-auction" in text
     assert "between 4,400 and 8,600" in text
 
 

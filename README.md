@@ -21,12 +21,12 @@ Run of 2026-10-28 (eval year 2025-10-26 – 2026-10-27, walk-forward, refit week
 |---|---|
 | Naive: yesterday's prices | 30.59 |
 | Seasonal naive: same weekday last week | 38.72 |
-| Per-hour ridge regression (LEAR-style linear baseline) | 22.66 |
-| **LightGBM, with the TSOs' generation forecast for day D** (assumed known at gate closure) | **19.65** (+35.8% vs naive) |
-| LightGBM, strictly pre-auction SMARD inputs only | 25.24 (+17.6% vs naive) |
+| Per-hour ridge regression (LEAR-style linear baseline, with the day-D TSO forecast) | 22.66 |
+| **LightGBM, strictly pre-auction SMARD inputs only** (what exists at 12:00) | **25.24** (+17.6% vs naive) |
+| LightGBM with the TSOs' generation forecast for day D, which SMARD publishes only after the auction (assumed known, as for a trader with TSO feeds) | 19.65 (+35.8% vs naive) |
 
 - **p10–p90 band:** raw coverage 62%, 75% after walk-forward conformal calibration (target 80%).
-- **Battery (1 MW / 2 MWh)** with the model forecast: **80,832 €/yr, 94.1% of perfect foresight**; naive forecast 76,494 €/yr; edge +4,338 €/yr (gross, no fees or degradation).
+- **Battery (1 MW / 2 MWh):** the forecast adds **+4,338 €/yr** over a naive forecast (gross, no fees or degradation). Revenue 80,832 €/yr (94.1% of perfect foresight) against 76,494 €/yr for naive: most of it is the battery, not the forecast. These schedules use the full model's forecasts (TSO forecast for day D assumed known); the backtest has not been re-run on pre-auction forecasts.
 - Across the efficiency × duration sweep the edge over naive stays between 4,357 and 8,575 €/MW/yr.
 - **Local agent, development set** (tuned on): 27/28 (96%).
 <!-- results:end -->
@@ -66,14 +66,16 @@ which nothing can be fetched opens an issue.
 A backtest can be re-run until it looks good. The dashboard therefore also shows
 what cannot be re-run:
 
-- **Forward test.** Every morning the pipeline records a forecast for the next
-  delivery day in `reports/forward_ledger.parquet` — before the 12:00 day-ahead
+- **Forward test.** Each morning the scheduled pipeline is set to record a forecast
+  for the next delivery day in `reports/forward_ledger.parquet` — before the 12:00 day-ahead
   auction closes (the command checks the clock and refuses afterwards), on a
   feature set with nothing dated on the delivery day. Once SMARD publishes the
   cleared prices, the record is scored against both naive baselines; scored
   records are never overwritten. Expect this live model to be weaker than the
   backtest: the backtest uses SMARD's generation forecast *for* the delivery
-  day, which SMARD only publishes after the auction.
+  day, which SMARD only publishes after the auction. As of this commit the
+  ledger is still empty (no scored live day yet); the dashboard says so instead
+  of showing a forecast it has not recorded.
 - **Uptime calendar.** One cell per day since 2026-07-04, counted from the
   pipeline's own commit history. GitHub starts only some scheduled runs, often
   late, so pale days are normal; an empty day would be an outage.

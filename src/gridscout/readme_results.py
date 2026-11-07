@@ -45,22 +45,25 @@ def render_results(reports_dir: Path) -> str:
         "|---|---|",
         f"| Naive: yesterday's prices | {naive:.2f} |",
         f"| Seasonal naive: same weekday last week | {models['seasonal_naive_7d']['mae']:.2f} |",
-        f"| Per-hour ridge regression (LEAR-style linear baseline) | "
+        f"| Per-hour ridge regression (LEAR-style linear baseline, with the day-D TSO forecast) | "
         f"{models['ridge_per_hour']['mae']:.2f} |",
-        f"| **LightGBM, with the TSOs' generation forecast for day D** "
-        f"(assumed known at gate closure) | **{lgbm:.2f}** "
-        f"({forecast['skill']['lgbm_vs_naive_pct']:+.1f}% vs naive) |",
-        f"| LightGBM, strictly pre-auction SMARD inputs only | "
-        f"{pre['lgbm_pre_auction']['mae']:.2f} "
+        f"| **LightGBM, strictly pre-auction SMARD inputs only** (what exists at 12:00) | "
+        f"**{pre['lgbm_pre_auction']['mae']:.2f}** "
         f"({forecast['pre_auction']['skill_vs_naive_pct']:+.1f}% vs naive) |",
+        f"| LightGBM with the TSOs' generation forecast for day D, which SMARD publishes "
+        f"only after the auction (assumed known, as for a trader with TSO feeds) | "
+        f"{lgbm:.2f} ({forecast['skill']['lgbm_vs_naive_pct']:+.1f}% vs naive) |",
         "",
         f"- **p10–p90 band:** raw coverage {quant['coverage_p10_p90']:.0%}, "
         f"{quant['conformal']['coverage_p10_p90']:.0%} after walk-forward conformal "
         "calibration (target 80%).",
-        f"- **Battery (1 MW / 2 MWh)** with the model forecast: "
-        f"**{rev['model']:,.0f} €/yr, {battery['capture_rate_model']:.1%} of perfect foresight**; "
-        f"naive forecast {rev['naive']:,.0f} €/yr; edge "
-        f"{battery['model_edge_over_naive_eur']:+,.0f} €/yr (gross, no fees or degradation).",
+        f"- **Battery (1 MW / 2 MWh):** the forecast adds "
+        f"**{battery['model_edge_over_naive_eur']:+,.0f} €/yr** over a naive forecast "
+        f"(gross, no fees or degradation). Revenue {rev['model']:,.0f} €/yr "
+        f"({battery['capture_rate_model']:.1%} of perfect foresight) against "
+        f"{rev['naive']:,.0f} €/yr for naive: most of it is the battery, not the forecast. "
+        "These schedules use the full model's forecasts (TSO forecast for day D assumed known); "
+        "the backtest has not been re-run on pre-auction forecasts.",
     ]
     if sensitivity:
         edges = [c["model_edge_over_naive_eur_per_mw_year"] for c in sensitivity.get("cells", [])]
