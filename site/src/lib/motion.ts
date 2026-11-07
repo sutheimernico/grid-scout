@@ -11,6 +11,16 @@ export function countAt(target: number, elapsedMs: number, durationMs: number): 
   return target * easeOutCubic(elapsedMs / durationMs);
 }
 
+/** Where a count-up starts, as a share of its target: never from zero, because a
+ *  reveal fades the number in and a faded "0 %" is the first thing the eye catches. */
+export const COUNT_FROM = 0.7;
+
+/** Value `elapsedMs` into a settle from COUNT_FROM x target up to `target`. */
+export function settleAt(target: number, elapsedMs: number, durationMs: number): number {
+  const from = target * COUNT_FROM;
+  return from + (target - from) * easeOutCubic(durationMs <= 0 ? 1 : elapsedMs / durationMs);
+}
+
 export function prefersReducedMotion(): boolean {
   return typeof window !== "undefined" && typeof window.matchMedia === "function"
     ? window.matchMedia("(prefers-reduced-motion: reduce)").matches
@@ -42,10 +52,10 @@ export function useInView<T extends Element>(threshold = 0.2): [React.RefObject<
   return [ref, seen];
 }
 
-/** Counts from 0 to `target` once `active`; returns the final value immediately
+/** Settles from 70% of `target` up to it once `active`; returns the final value immediately
  *  when motion is reduced. */
 export function useCountUp(target: number, active: boolean, durationMs = 900, delayMs = 0): number {
-  const [value, setValue] = useState(() => (prefersReducedMotion() ? target : 0));
+  const [value, setValue] = useState(() => (prefersReducedMotion() ? target : target * COUNT_FROM));
   useEffect(() => {
     if (!active) return;
     if (prefersReducedMotion()) {
@@ -57,7 +67,7 @@ export function useCountUp(target: number, active: boolean, durationMs = 900, de
     const tick = (now: number) => {
       if (!start) start = now + delayMs;
       const elapsed = now - start;
-      setValue(countAt(target, Math.max(0, elapsed), durationMs));
+      setValue(settleAt(target, Math.max(0, elapsed), durationMs));
       if (elapsed < durationMs) raf = requestAnimationFrame(tick);
       else setValue(target);
     };
