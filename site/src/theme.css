@@ -842,7 +842,11 @@ table.data-table td.neg {
   font-size: 13px;
   color: var(--ink-muted);
   text-align: left;
-  padding: 0 0 8px;
+  padding: 0 14px 8px 0;
+}
+.matrix thead th:first-child {
+  white-space: nowrap;
+  padding-right: 24px;
 }
 .matrix td,
 .matrix tbody th {

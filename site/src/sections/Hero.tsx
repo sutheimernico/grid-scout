@@ -126,7 +126,7 @@ export function Hero({
             <p className="lede">
               A LightGBM forecast
               {ready && nHours
-                ? `, validated walk-forward over ${ready.eval.eval_period.n_days} days (${fmtNum(nHours)} out-of-sample hours)`
+                ? `, validated walk-forward over ${fmtNum(Math.round(nHours / 24))} days (${fmtNum(nHours)} out-of-sample hours)`
                 : ""}
               , against naive and linear baselines.{" "}
               {recording

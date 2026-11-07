@@ -704,7 +704,7 @@ describe("freshness keeps ageing after the export", () => {
       const rows = Array.from(container.querySelectorAll(".health-item")) as HTMLElement[];
       const price = rows.find((r) => within(r).queryByText("price_day_ahead"))!;
       expect(price.querySelector(".dot")!.getAttribute("style")).toContain("--critical");
-      expect(within(price).getByText(/^2\d\d\.\d h$/)).toBeTruthy();
+      expect(within(price).getByText("10 d")).toBeTruthy();
     } finally {
       vi.useRealTimers();
     }

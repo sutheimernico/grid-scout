@@ -1,4 +1,4 @@
-import { fmtNum, prettyText } from "../lib/format";
+import { fmtNum } from "../lib/format";
 import type { AgentData } from "../types";
 import { CountUp, Reveal } from "../ui";
 import { useInView } from "../lib/motion";
@@ -82,7 +82,7 @@ export function Agent({ data }: { data: AgentData }) {
           <Reveal className="transcripts">
             <h3 style={{ marginBottom: 6 }}>Sample transcripts, including failures</h3>
             <p className="small" style={{ marginBottom: 14 }}>
-              curated one pass + one fail per question type
+              curated one pass + one fail per question type · transcripts are the agent's raw output, unedited
               {data.generated_utc
                 ? ` · recorded ${data.generated_utc.slice(0, 10)}; figures quote that day's data, not today's`
                 : ""}
@@ -92,12 +92,12 @@ export function Agent({ data }: { data: AgentData }) {
                 <summary>
                   <span className={`badge ${ex.passed ? "badge-pass" : "badge-fail"}`}>{ex.passed ? "PASS" : "FAIL"}</span>
                   <span>
-                    <span className="t-type">{typeLabel(ex.type)}</span> {prettyText(ex.question)}
+                    <span className="t-type">{typeLabel(ex.type)}</span> {ex.question}
                   </span>
                 </summary>
-                <div className="t-a">{ex.answer ? prettyText(ex.answer) : <em>(no final answer)</em>}</div>
+                <div className="t-a">{ex.answer || <em>(no final answer)</em>}</div>
                 <div className="t-meta">
-                  gold: {prettyText(ex.gold)}
+                  gold: {ex.gold}
                   {ex.tools_used.length > 0 && <> · tools: {ex.tools_used.join(", ")}</>}
                 </div>
               </details>

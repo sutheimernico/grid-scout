@@ -35,7 +35,8 @@ function healthAge(s: HealthEntry, sinceExportHours: number): string {
   if (s.age_hours == null) return "–";
   const age = s.age_hours + sinceExportHours;
   if (age < 0) return `reaches +${Math.round(-age)} h`;
-  return `${fmtNum(age, 1)} h`;
+  // beyond two days an hour count stops being readable: "10 d", not "243.7 h"
+  return age >= 48 ? `${Math.floor(age / 24)} d` : `${fmtNum(age, 1)} h`;
 }
 
 export function Health({ health, uptime }: { health: Loadable<HealthData>; uptime: Loadable<UptimeData> }) {

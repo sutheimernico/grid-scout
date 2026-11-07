@@ -44,10 +44,18 @@ export function negativeSpans(values: (number | null)[]): [number, number][] {
   return spans;
 }
 
+function isNextDay(a: string, b: string): boolean {
+  return Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`) === 86_400_000;
+}
+
 /** The last `maxDays` complete delivery days (Europe/Berlin calendar days, so a
  *  23- or 25-hour DST day counts as one) of the backtest series. A day is
- *  complete when it has at least 23 hourly points. Returns null when no day
- *  qualifies, so the caller can show an honest empty state. */
+ *  complete when it has at least 23 hourly points AND at least 23 of them carry
+ *  a forecast: a day with prices but no forecast (the pre-auction model has none
+ *  where an input series has a hole) would otherwise be drawn as a stub and make
+ *  "these 3 days" cover two. Returns null when no day qualifies, so the caller
+ *  can show an honest empty state. The days are consecutive: a run broken by an
+ *  incomplete day stops there. */
 export function pickHeroWindow(recent: RecentSeries, maxDays = 3): HeroWindow | null {
   const byDay = new Map<string, number[]>();
   recent.timestamps.forEach((ts, i) => {
@@ -56,7 +64,16 @@ export function pickHeroWindow(recent: RecentSeries, maxDays = 3): HeroWindow | 
     list.push(i);
     byDay.set(date, list);
   });
-  const complete = [...byDay.entries()].filter(([, idx]) => idx.length >= 23).slice(-maxDays);
+  const ok = [...byDay.entries()].filter(
+    ([, idx]) => idx.length >= 23 && idx.filter((i) => recent.predicted[i] != null).length >= 23,
+  );
+  // Only the latest unbroken run of days: glueing 22 Oct next to 26 Oct would read as
+  // one continuous curve on a shared hourly axis.
+  const complete: typeof ok = [];
+  for (let k = ok.length - 1; k >= 0 && complete.length < maxDays; k--) {
+    if (complete.length && !isNextDay(ok[k][0], complete[0][0])) break;
+    complete.unshift(ok[k]);
+  }
   if (!complete.length) return null;
 
   const indices = complete.flatMap(([, idx]) => idx);

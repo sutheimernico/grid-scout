@@ -108,13 +108,14 @@ export function monthTickIndices(labels: string[], innerW: number, minGapPx = 60
   if (n === 0) return [];
   let starts = labels.map((l, i) => (i === 0 || l !== labels[i - 1] ? i : -1)).filter((i) => i >= 0);
   const px = (i: number) => (n <= 1 ? 0 : (i / (n - 1)) * innerW);
-  // a series that begins late in a month: that short first month would crowd the next label
+  // a series that begins late in a month: its short first month would crowd the next label,
+  // and the later month is the one whose first day really is on the axis
   if (
     starts.length > 2 &&
     starts[1] - starts[0] < 0.8 * (starts[2] - starts[1]) &&
     px(starts[1]) - px(starts[0]) < minGapPx
   )
-    starts = [starts[0], ...starts.slice(2)];
+    starts = starts.slice(1);
   // then thin evenly (every second, third ... month) until every gap fits; never greedily,
   // so the spacing stays regular
   const fits = (idx: number[]) => idx.every((v, k) => k === 0 || px(v) - px(idx[k - 1]) >= minGapPx);

@@ -106,9 +106,9 @@ describe("monthTickIndices", () => {
     const labels = days([["Nov", 30], ["Dec", 31], ["Jan", 31]]);
     expect(monthTickIndices(labels, 920)).toEqual([0, 30, 61]);
   });
-  it("skips a month that starts right after the series does", () => {
+  it("drops a short first month rather than the month that follows it", () => {
     const labels = days([["Oct", 5], ["Nov", 30], ["Dec", 31]]);
-    expect(monthTickIndices(labels, 600)).toEqual([0, 35]);
+    expect(monthTickIndices(labels, 600)).toEqual([5, 35]);
   });
   it("thins evenly when the width cannot hold every month", () => {
     const labels = days(Array.from({ length: 12 }, (_, i) => [`M${i}`, 30] as [string, number]));

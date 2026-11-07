@@ -52,6 +52,17 @@ describe("pickHeroWindow", () => {
     expect(w.days[0].to - w.days[0].from).toBe(25);
   });
 
+  it("keeps only the latest unbroken run when a day has prices but no forecast", () => {
+    const s = series("2026-10-23T22:00:00Z", 24 * 4 + 1);
+    // 25 Oct (hours 24 to 48 of the series, 25 h) has no forecast at all
+    const predicted = s.predicted.map((v, i) => (i >= 24 && i < 49 ? null : v));
+    const w = pickHeroWindow({ ...s, predicted }, 3)!;
+    // 24 Oct is complete but not adjacent to 26 Oct: it is not glued onto the axis
+    expect(w.days.map((d) => d.date)).toEqual(["2026-10-26", "2026-10-27"]);
+    expect(w.stats.nHours).toBe(w.timestamps.length);
+    expect(w.predicted.every((v) => v != null)).toBe(true);
+  });
+
   it("returns null when no day is complete", () => {
     expect(pickHeroWindow(series("2026-10-20T10:00:00Z", 10))).toBeNull();
   });
