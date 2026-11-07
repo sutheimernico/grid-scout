@@ -249,3 +249,10 @@ class TestSelfContradiction:
         assert out["results"][0]["regraded_fail"] is True
         assert "regraded_fail" not in out["results"][1]
         assert out["generated_utc"] == "2026-01-01T00:00:00+00:00"
+
+    def test_regrade_does_not_invent_a_run_date(self):
+        report = {
+            "model": "m",
+            "results": [{"id": "a", "type": "trap", "answer": "no", "passed": True}],
+        }
+        assert "generated_utc" not in regrade(report)

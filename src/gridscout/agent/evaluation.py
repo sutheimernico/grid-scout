@@ -500,7 +500,11 @@ def regrade(report: dict) -> dict:
             }
         )
     out = _summarise(results, report["model"])
-    out["generated_utc"] = report.get("generated_utc", out["generated_utc"])
+    # a regrade is not a run: keep the original date, or none if the run never had one
+    if report.get("generated_utc"):
+        out["generated_utc"] = report["generated_utc"]
+    else:
+        del out["generated_utc"]
     return out
 
 
