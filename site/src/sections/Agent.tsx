@@ -1,13 +1,21 @@
-import { fmtNum } from "../lib/format";
+import { fmtNum, prettyText } from "../lib/format";
 import type { AgentData } from "../types";
 import { CountUp, Reveal } from "../ui";
 import { useInView } from "../lib/motion";
+
+const TYPE_LABEL: Record<string, string> = {
+  factual: "Factual",
+  analytical: "Analytical",
+  report: "Report",
+  trap: "Trap",
+};
+export const typeLabel = (t: string) => TYPE_LABEL[t] ?? t.charAt(0).toUpperCase() + t.slice(1);
 
 function QuestionRow({ type, n, passed, why, seen }: { type: string; n: number; passed: number; why: string; seen: boolean }) {
   return (
     <div className="q-row" role="row">
       <span role="rowheader">
-        {type} questions
+        {typeLabel(type)} questions
         <span className="why">{why}</span>
       </span>
       <span className="q-grid" aria-hidden="true">
@@ -41,6 +49,9 @@ export function Agent({ data }: { data: AgentData }) {
               grounded in the same data. It is <em>measured</em>, not demoed: every answer is graded programmatically
               against tool output — numeric tolerance for facts, refusal detection for trap questions it must decline.
               No LLM judge.
+              {data.regraded
+                ? ` The grader also fails an answer that contradicts itself; ${data.regraded} answer in the stored run had the right number and nonsense around it, so it was regraded offline.`
+                : ""}
             </p>
             <div className="big-figure" style={{ marginTop: 28 }}>
               <CountUp value={data.pass_rate * 100} active={seen} format={(v) => `${fmtNum(v, 0)}`} />
@@ -81,12 +92,12 @@ export function Agent({ data }: { data: AgentData }) {
                 <summary>
                   <span className={`badge ${ex.passed ? "badge-pass" : "badge-fail"}`}>{ex.passed ? "PASS" : "FAIL"}</span>
                   <span>
-                    <span className="t-type">{ex.type}</span> {ex.question}
+                    <span className="t-type">{typeLabel(ex.type)}</span> {prettyText(ex.question)}
                   </span>
                 </summary>
-                <div className="t-a">{ex.answer || <em>(no final answer)</em>}</div>
+                <div className="t-a">{ex.answer ? prettyText(ex.answer) : <em>(no final answer)</em>}</div>
                 <div className="t-meta">
-                  gold: {ex.gold}
+                  gold: {prettyText(ex.gold)}
                   {ex.tools_used.length > 0 && <> · tools: {ex.tools_used.join(", ")}</>}
                 </div>
               </details>

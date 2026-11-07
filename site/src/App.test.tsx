@@ -319,10 +319,9 @@ describe("App states", () => {
     setReady();
     render(<App />);
     expect(screen.getByText(/Most of the revenue is the battery, not the forecast/)).toBeTruthy();
-    expect(screen.getByText(/\+3,284/, { selector: ".big-figure" })).toBeTruthy();
+    expect(screen.getByText(/\+3,293/, { selector: ".big-figure" })).toBeTruthy();
     expect(screen.getByText(/44\.0% less error than copying/)).toBeTruthy();
     expect(screen.getByText(/Generation mix/)).toBeTruthy();
-    expect(screen.getByText(forecast.eval.finding)).toBeTruthy();
     expect(screen.getByText(/Sample transcripts/)).toBeTruthy();
     expect(screen.queryByText(/not produced yet/)).toBeNull();
   });
@@ -435,7 +434,7 @@ describe("market caption", () => {
   it("shows the rule-written summary of the last complete day", () => {
     setReady();
     render(<App />);
-    expect(screen.getByText(/What happened on 2026-09-19/)).toBeTruthy();
+    expect(screen.getByText(/What happened on 19 Sep 2026/)).toBeTruthy();
     expect(screen.getByText(/Cheapest hour 13:00/)).toBeTruthy();
     expect(screen.getByText(/no model, nothing that can invent a driver/)).toBeTruthy();
   });
@@ -471,6 +470,13 @@ describe("uptime calendar", () => {
 });
 
 describe("health panel", () => {
+  // ages in the artifact are as of its export, so pin the clock to the export
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(health.generated_at));
+  });
+  afterEach(() => vi.useRealTimers());
+
   it("shows human labels and never a negative age for forecast series", () => {
     setReady();
     const { container } = render(<App />);
@@ -503,6 +509,12 @@ describe("health panel", () => {
 });
 
 describe("derived report freshness", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(health.generated_at));
+  });
+  afterEach(() => vi.useRealTimers());
+
   it("alarms on a missed weekly cadence but never on the manual eval", () => {
     setReady();
     const { container } = render(<App />);
@@ -511,7 +523,7 @@ describe("derived report freshness", () => {
 
     const forecastRow = byLabel("Forecast walk-forward eval");
     expect(forecastRow.querySelector(".dot")!.getAttribute("style")).toContain("--critical");
-    expect(within(forecastRow).getByText("21d")).toBeTruthy();
+    expect(within(forecastRow).getByText("21 d")).toBeTruthy();
     expect(byLabel("Battery backtest").querySelector(".dot")!.getAttribute("style")).toContain(
       "--good",
     );
@@ -546,7 +558,7 @@ describe("hero chart", () => {
     render(<App />);
     expect(screen.getByRole("img", { name: /Day-ahead forecast against cleared prices for Sun 20 Sep/ })).toBeTruthy();
     expect(screen.getByText(/Backtest, not live/)).toBeTruthy();
-    expect(screen.getByText(/This day: MAE 4\.4 €\/MWh, over the whole eval year 15\.25 · 96% of hours inside the band/)).toBeTruthy();
+    expect(screen.getByText(/This day: MAE 4\.4 €\/MWh; the full model over the whole eval year: 15\.25 · 96% of hours inside the band/)).toBeTruthy();
   });
 
   it("shows no hero chart when no complete day is available, instead of a half day", () => {
@@ -605,7 +617,7 @@ describe("honest headline", () => {
     });
     render(<App />);
     expect(screen.getByRole("heading", { level: 2, name: /17\.6% less error than yesterday's prices, on public pre-auction data/ })).toBeTruthy();
-    expect(screen.getByText(/battery backtest below all use the second/)).toBeTruthy();
+    expect(screen.getByText(/The band, the hour and weekday slices below use the second, full model/)).toBeTruthy();
   });
 
   it("opens with the pre-auction figure in the hero and highlights that ruler row, not the full model", () => {
@@ -634,7 +646,7 @@ describe("honest headline", () => {
   it("says nothing was recorded while the ledger is empty, never that it is recorded every morning", () => {
     setAll("missing");
     render(<App />);
-    expect(screen.getByText(/Nothing has been recorded yet/)).toBeTruthy();
+    expect(screen.getByText(/No forward ledger yet/)).toBeTruthy();
     expect(screen.queryByText(/every morning the pipeline records/)).toBeNull();
   });
 });
@@ -679,5 +691,99 @@ describe("sumMembers", () => {
 
   it("keeps a null hour null only when every member is null", () => {
     expect(sumMembers({ a: [null, 2], b: [null, null] }, ["a", "b"])).toEqual([null, 2]);
+  });
+});
+
+describe("freshness keeps ageing after the export", () => {
+  it("turns a green series red when the page is opened days after the artifact was written", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(new Date(health.generated_at).getTime() + 10 * 24 * 3_600_000));
+    try {
+      setReady();
+      const { container } = render(<App />);
+      const rows = Array.from(container.querySelectorAll(".health-item")) as HTMLElement[];
+      const price = rows.find((r) => within(r).queryByText("price_day_ahead"))!;
+      expect(price.querySelector(".dot")!.getAttribute("style")).toContain("--critical");
+      expect(within(price).getByText(/^2\d\d\.\d h$/)).toBeTruthy();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe("hero follows the model in the headline", () => {
+  const t0 = Date.parse("2026-09-20T00:00:00+02:00");
+  const day = {
+    timestamps: Array.from({ length: 24 }, (_, i) => new Date(t0 + i * 3_600_000).toISOString()),
+    actual: Array.from({ length: 24 }, (_, i) => 50 + i),
+    predicted: Array.from({ length: 24 }, (_, i) => 52 + i),
+    q10: Array.from({ length: 24 }, (_, i) => 30 + i),
+    q90: Array.from({ length: 24 }, (_, i) => 80 + i),
+  };
+  const preEval = {
+    ...forecast.eval,
+    pre_auction: {
+      n: 8737,
+      skill_vs_naive_pct: 17.6,
+      models: {
+        naive_yesterday: { mae: 30.62, rmse: 48 },
+        seasonal_naive_7d: { mae: 38.38, rmse: 58 },
+        ridge_pre_auction: { mae: 26.85, rmse: 40 },
+        lgbm_pre_auction: { mae: 25.24, rmse: 38 },
+        lgbm_gate_closure: { mae: 19.67, rmse: 31 },
+      },
+    },
+  };
+
+  it("never renders a headline figure for an export that only has the full model", () => {
+    setReady();
+    artifacts.set("forecast.json", { state: "ready", data: { ...forecast, recent: day } });
+    const { container } = render(<App />);
+    expect(container.querySelector(".hero-figure")).toBeNull();
+    expect(container.querySelector(".hero-chart .readout")!.textContent).toMatch(/Forecast, full model/);
+    expect(container.textContent).not.toMatch(/less error than yesterday's prices, using only what exists/);
+  });
+
+  it("draws the pre-auction series, says so, and does not hang the full model's band over it", () => {
+    setReady();
+    const recent = { ...day, predicted_pre_auction: day.predicted.map((v) => v + 5) };
+    artifacts.set("forecast.json", { state: "ready", data: { ...forecast, eval: preEval, recent } });
+    const { container } = render(<App />);
+    expect(container.querySelector(".hero-chart .readout")!.textContent).toMatch(/Forecast, pre-auction model/);
+    expect(container.querySelector(".hero-chart .bandkey")).toBeNull();
+    expect(container.querySelector(".hero-chart")!.textContent).toMatch(/pre-auction model over the whole eval year: 25\.24/);
+    expect(container.querySelector(".hero-chart")!.textContent).not.toMatch(/19\.6/);
+  });
+});
+
+describe("battery units", () => {
+  it("shows the annualised pre-auction edge first and the full-model edge second", () => {
+    setReady();
+    artifacts.set("battery.json", {
+      state: "ready",
+      data: {
+        ...battery,
+        summary: {
+          ...battery.summary,
+          forecast: "pred_point_pre_auction",
+          model_edge_over_naive_eur_per_mw_year: 3293,
+          full_model: { capture_rate_model: 0.94, model_edge_over_naive_eur_per_mw_year: 6000 },
+        },
+      },
+    });
+    const { container } = render(<App />);
+    expect(container.querySelector(".big-figure")!.textContent).toMatch(/\+3,293/);
+    expect(container.textContent).toMatch(/Annualised from 364 backtest days/);
+    expect(container.textContent).toMatch(/the edge would be \+6,000 € a year/);
+  });
+});
+
+describe("unreadable artifacts", () => {
+  it("says it could not read a corrupt file instead of 'not produced yet'", () => {
+    setAll("missing");
+    artifacts.set("market.json", { state: "error" });
+    render(<App />);
+    expect(screen.getByText(/could not read market data/)).toBeTruthy();
+    expect(screen.getByText(/agent evaluation not produced yet/)).toBeTruthy();
   });
 });

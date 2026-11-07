@@ -24,13 +24,11 @@ export function Evidence({ data }: { data: ForecastData }) {
             </h2>
             <p className="note">
               {pre
-                ? `Two models, two answers: ${fmtNum(pre.skill_vs_naive_pct, 1)}% with inputs published before the auction, ${fmtNum(ev.skill.lgbm_vs_naive_pct, 1)}% when the TSOs' generation forecast for the delivery day is assumed known, as it is for a trader with TSO feeds. `
-                : ""}
-              The hero chart, the band, the hour and weekday slices and the battery backtest below all use the second,
-              full model; the battery backtest has not been re-run on pre-auction forecasts. Every number is
-              out-of-sample: expanding walk-forward over a full year, refit weekly.
+                ? `Two models, two answers: ${fmtNum(pre.skill_vs_naive_pct, 1)}% with inputs published before the auction, ${fmtNum(rows.find((r) => r.key === "lgbm_point")?.skillVsNaive ?? ev.skill.lgbm_vs_naive_pct, 1)}% when the TSOs' generation forecast for the delivery day is assumed known, a stand-in for a commercial weather-based forecast. The hero chart and the battery figure use the first. The band, the hour and weekday slices below use the second, full model. `
+                : "The hero chart, the band, the hour and weekday slices and the battery backtest use the full model, which assumes the TSOs' generation forecast for the delivery day is known. "}
+              Every number is out-of-sample: expanding walk-forward over a full year, refit weekly
+              {pre?.n ? `; the ruler compares all models on the same ${fmtNum(pre.n)} hours` : ""}.
             </p>
-            <p className="note">{unitSpelling(ev.finding)}</p>
           </Reveal>
           <Reveal>
             <Scoreboard rows={rows} />
@@ -95,7 +93,12 @@ export function Segments({ segments }: { segments?: SegmentAnalysis }) {
                 : `A baseline still beats the model in: ${losing.map((s) => s.segment).join(", ")}.`}
             </p>
             <p className="subhead">By hour of day (Europe/Berlin)</p>
-            <SkillBars segments={segments.by_hour} label="Forecast skill by hour of day" labelEvery={3} />
+            <SkillBars
+              segments={segments.by_hour}
+              label="Forecast skill by hour of day"
+              labelEvery={3}
+              highlight={[best?.segment, worst?.segment].filter((v): v is string => Boolean(v))}
+            />
           </Reveal>
           <Reveal>
             <p className="subhead" style={{ marginTop: 0 }}>By weekday</p>
@@ -133,6 +136,9 @@ export function Segments({ segments }: { segments?: SegmentAnalysis }) {
                   </div>
                 ) : null,
               )}
+              <div className="small" style={{ marginTop: 8 }}>
+                Counted over the walk-forward eval period, not the calendar year used in the market section below.
+              </div>
             </div>
           </Reveal>
         </div>

@@ -31,22 +31,28 @@ export function CountUp({
   digits = 0,
   active,
   delayMs = 0,
+  duration = 900,
   format,
 }: {
   value: number;
   digits?: number;
   active: boolean;
   delayMs?: number;
+  duration?: number;
   format?: (v: number) => string;
 }) {
-  const v = useCountUp(value, active, 900, delayMs);
+  const v = useCountUp(value, active, duration, delayMs);
   return <>{format ? format(v) : fmtNum(v, digits)}</>;
 }
 
-export function Pending({ what, state }: { what: string; state: "loading" | "missing" }) {
+export function Pending({ what, state }: { what: string; state: "loading" | "missing" | "error" }) {
   return (
     <p className="pending">
-      {state === "loading" ? `loading ${what}…` : `${what} not produced yet — the pipeline will fill this in.`}
+      {state === "loading"
+        ? `loading ${what}…`
+        : state === "error"
+          ? `could not read ${what} — the file exists but is not valid, so nothing is shown instead of a guess.`
+          : `${what} not produced yet — the pipeline will fill this in.`}
     </p>
   );
 }

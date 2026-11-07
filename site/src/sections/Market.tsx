@@ -1,6 +1,6 @@
 import { LineChart } from "../charts/LineChart";
 import { StackedArea } from "../charts/StackedArea";
-import { fmtDateTime, fmtDay, fmtNum, fmtPct, unitSpelling } from "../lib/format";
+import { fmtCalendarDate, fmtDateTime, fmtDay, fmtNum, fmtPct, prettyText } from "../lib/format";
 import type { MarketData } from "../types";
 import { Reveal } from "../ui";
 
@@ -63,7 +63,7 @@ export function Market({ data }: { data: MarketData }) {
           </div>
           <div className="kpi">
             <b>{fmtNum(k.negative_price_hours_ytd)}</b>
-            <span>hours below 0 €/MWh this year</span>
+            <span>hours below 0 €/MWh since 1 January</span>
           </div>
           <div className="kpi">
             <b>{fmtPct(k.renewables_share_last_24h, 0)}</b>
@@ -89,7 +89,7 @@ export function Market({ data }: { data: MarketData }) {
         <div className="split wide-left" style={{ marginTop: "clamp(36px, 5vw, 56px)" }}>
           <Reveal>
             <p className="subhead" style={{ marginTop: 0 }}>
-              Generation mix, GWh per hour, measured, grouped from 11 SMARD series
+              Generation mix, GW (hourly average), measured, grouped from 11 SMARD series
             </p>
             <div className="chart-plate">
               <StackedArea
@@ -115,8 +115,8 @@ export function Market({ data }: { data: MarketData }) {
           </Reveal>
           {data.explanation && (
             <Reveal className="stack">
-              <p className="happened-label">What happened on {data.explanation.day}</p>
-              <p className="happened">{unitSpelling(data.explanation.caption)}</p>
+              <p className="happened-label">What happened on {fmtCalendarDate(data.explanation.day)}</p>
+              <p className="happened">{prettyText(data.explanation.caption)}</p>
               <p className="small">
                 Assembled by rule from the same numbers the charts show — no model, nothing that can invent a driver.
               </p>

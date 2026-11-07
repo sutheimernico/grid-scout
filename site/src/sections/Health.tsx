@@ -1,5 +1,6 @@
 import { Heatmap } from "../charts/Heatmap";
-import { healthTone, type Tone } from "../lib/freshness";
+import { healthTone, hoursSince, liveReport, type Tone } from "../lib/freshness";
+import { fmtNum } from "../lib/format";
 import type { Loadable } from "../lib/useData";
 import type { HealthData, HealthEntry, ReportEntry, UptimeData } from "../types";
 import { Pending, Reveal } from "../ui";
@@ -20,21 +21,26 @@ function reportColor(status: ReportEntry["status"]): string {
   return "var(--ink-muted)";
 }
 
-function reportAge(r: ReportEntry): string {
-  if (r.age_days == null) return r.status;
-  return `${r.age_days.toFixed(0)}d`;
+function reportAge(r: ReportEntry, sinceExportHours: number): string {
+  const { ageDays, status } = liveReport(r, sinceExportHours);
+  if (ageDays == null) return status;
+  return `${Math.floor(ageDays)} d`;
 }
 
-function healthAge(s: HealthEntry): string {
+function healthAge(s: HealthEntry, sinceExportHours: number): string {
   if (s.status === "missing") return "missing";
   if (s.status === "discontinued") return "retired";
   // Forecast series run into the future, so their "age" is negative: show how far
   // ahead they reach instead of a nonsensical "-21.2h".
-  if (s.age_hours != null && s.age_hours < 0) return `reaches +${Math.round(-s.age_hours)} h`;
-  return `${s.age_hours}h`;
+  if (s.age_hours == null) return "–";
+  const age = s.age_hours + sinceExportHours;
+  if (age < 0) return `reaches +${Math.round(-age)} h`;
+  return `${fmtNum(age, 1)} h`;
 }
 
 export function Health({ health, uptime }: { health: Loadable<HealthData>; uptime: Loadable<UptimeData> }) {
+  // ages in the artifact are as of its export; add the time since so a dead pipeline cannot stay green
+  const since = health.state === "ready" ? hoursSince(health.data.generated_at) : 0;
   return (
     <section className="band" id="pipeline" aria-label="Pipeline health">
       <div className="wrap">
@@ -54,9 +60,9 @@ export function Health({ health, uptime }: { health: Loadable<HealthData>; uptim
               <div className="health-list">
                 {Object.entries(health.data.series).map(([name, s]) => (
                   <div className="health-item" key={name} title={s.note ?? name}>
-                    <span className="dot" style={{ background: TONE_VAR[healthTone(s)] }} />
+                    <span className="dot" style={{ background: TONE_VAR[healthTone(s, since)] }} />
                     <span className="name">{s.label ?? name}</span>
-                    <span className="age">{healthAge(s)}</span>
+                    <span className="age">{healthAge(s, since)}</span>
                   </div>
                 ))}
               </div>
@@ -69,9 +75,9 @@ export function Health({ health, uptime }: { health: Loadable<HealthData>; uptim
                   <div className="health-list">
                     {Object.entries(health.data.reports).map(([file, r]) => (
                       <div className="health-item" key={file}>
-                        <span className="dot" style={{ background: reportColor(r.status) }} />
+                        <span className="dot" style={{ background: reportColor(liveReport(r, since).status) }} />
                         <span className="name">{r.label}</span>
-                        <span className="age">{reportAge(r)}</span>
+                        <span className="age">{reportAge(r, since)}</span>
                       </div>
                     ))}
                   </div>

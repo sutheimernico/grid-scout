@@ -26,11 +26,13 @@ interface Props {
   labelEvery?: number;
   /** print the value above each bar (for short series) */
   showValues?: boolean;
+  /** segments the heading names: drawn at full strength with a value, the rest recede */
+  highlight?: string[];
 }
 
 const MARGIN = { top: 20, right: 6, bottom: 26, left: 40 };
 
-export function SkillBars({ segments, label, height = 190, labelEvery = 1, showValues = false }: Props) {
+export function SkillBars({ segments, label, height = 190, labelEvery = 1, showValues = false, highlight = [] }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const WIDTH = useChartWidth(wrapRef);
   const innerW = WIDTH - MARGIN.left - MARGIN.right;
@@ -65,6 +67,8 @@ export function SkillBars({ segments, label, height = 190, labelEvery = 1, showV
           const x = MARGIN.left + i * slot + (slot - barW) / 2;
           const top = value >= 0 ? y(value) : y(0);
           const up = value >= 0;
+          const marked = highlight.includes(s.segment);
+          const dim = highlight.length > 0 && !marked;
           return (
             <g key={s.segment}>
               <rect
@@ -75,17 +79,18 @@ export function SkillBars({ segments, label, height = 190, labelEvery = 1, showV
                 width={barW}
                 height={Math.max(1, Math.abs(y(value) - y(0)))}
                 fill={up ? "var(--volt)" : "var(--neg)"}
+                opacity={dim ? 0.45 : 1}
               >
                 <title>
                   {`${s.segment}: model ${s.mae_model.toFixed(2)} vs naive ${s.mae_naive.toFixed(2)} EUR/MWh over ${s.n} hours`}
                 </title>
               </rect>
-              {showValues && (
+              {(showValues || marked) && (
                 <text x={x + barW / 2} y={(up ? top : top + Math.abs(y(value) - y(0))) + (up ? -6 : 14)} textAnchor="middle">
                   {fmtNum(value, 1)}%
                 </text>
               )}
-              {i % Math.max(labelEvery, Math.ceil(34 / slot)) === 0 && (
+              {(marked || i % Math.max(labelEvery, Math.ceil(34 / slot)) === 0) && (
                 <text x={x + barW / 2} y={height - 8} textAnchor="middle">
                   {s.segment}
                 </text>

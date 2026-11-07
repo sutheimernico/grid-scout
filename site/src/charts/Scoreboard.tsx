@@ -1,7 +1,6 @@
 import type { ScoreRow } from "../lib/scoreboard";
 import { rulerMax } from "../lib/scoreboard";
 import { fmtNum } from "../lib/format";
-import { CountUp } from "../ui";
 import { useInView } from "../lib/motion";
 
 /** One horizontal scale in EUR/MWh with every model on it. The distance between
@@ -48,7 +47,7 @@ export function Scoreboard({ rows }: { rows: ScoreRow[] }) {
                 style={{ width: pct(r.mae), ["--delay" as string]: `${i * 80}ms` }}
               />
               <span className="value" style={{ left: pct(r.mae) }}>
-                <CountUp value={r.mae} digits={2} active={seen} delayMs={i * 80} />
+                {fmtNum(r.mae, 2)}
               </span>
             </div>
           </div>

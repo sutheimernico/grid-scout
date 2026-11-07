@@ -59,7 +59,7 @@ export function Ledger({ ledger }: { ledger: Loadable<ForwardLedgerData> }) {
             <p className="lede" style={{ color: "var(--ink-2)" }}>
               {data
                 ? data.method
-                : "A backtest can be re-run until it looks good. This cannot: the pipeline is set up to record tomorrow's forecast each morning before the auction, and the cleared prices score it afterwards. Nothing has been recorded yet."}
+                : `A backtest can be re-run until it looks good. This cannot: the pipeline is set up to record tomorrow's forecast each morning before the auction, and the cleared prices score it afterwards.`}
             </p>
           </Reveal>
         </div>
@@ -69,7 +69,9 @@ export function Ledger({ ledger }: { ledger: Loadable<ForwardLedgerData> }) {
             <p className="statement">
               {ledger.state === "loading"
                 ? "loading the forward ledger…"
-                : "No forward ledger yet — the daily pre-auction run starts it. Everything above is the backtest."}
+                : ledger.state === "error"
+                  ? "Could not read the forward ledger: the file exists but is not valid. Everything above is the backtest."
+                  : "No forward ledger yet — the daily pre-auction run starts it. Everything above is the backtest."}
             </p>
             <Protocol />
           </div>

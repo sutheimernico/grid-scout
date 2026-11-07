@@ -10,7 +10,18 @@ const MARGIN = { top: 30, right: 14, bottom: 28, left: 46 };
 /** The hero: forecast, band and cleared prices for the last complete delivery
  *  days of the backtest. Hover or arrow keys move a crosshair; the values appear
  *  in the readout row above the plot so nothing floats over the curves. */
-export function HeroChart({ window: w, height = 380, yearMae }: { window: HeroWindow; height?: number; yearMae?: number }) {
+export function HeroChart({
+  window: w,
+  height = 380,
+  yearMae,
+  modelLabel = "full model",
+}: {
+  window: HeroWindow;
+  height?: number;
+  yearMae?: number;
+  /** which model the forecast line is, shown in the legend; the band exists only for the full model */
+  modelLabel?: string;
+}) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const WIDTH = useChartWidth(wrapRef, 1240);
   const [hover, setHover] = useState<number | null>(null);
@@ -33,6 +44,7 @@ export function HeroChart({ window: w, height = 380, yearMae }: { window: HeroWi
 
   const col = innerW / n;
   const hours = useMemo(() => w.timestamps.map((t) => localParts(t)), [w.timestamps]);
+  const hasBand = w.stats.coverage != null;
   const compact = WIDTH < 560;
   const labelEvery = compact ? 12 : 6;
 
@@ -68,11 +80,13 @@ export function HeroChart({ window: w, height = 380, yearMae }: { window: HeroWi
               <i className="sw" /> Cleared price
             </span>
             <span className="key">
-              <i className="sw model" /> Forecast, full model
+              <i className="sw model" /> Forecast, {modelLabel}
             </span>
-            <span className="key">
-              <i className="sw bandkey" /> p10 to p90 band
-            </span>
+            {hasBand && (
+              <span className="key">
+                <i className="sw bandkey" /> p10 to p90 band
+              </span>
+            )}
             {w.negativeSpans.length > 0 && (
               <span className="key">
                 <i className="sw negcol" /> Hours below 0
@@ -80,7 +94,7 @@ export function HeroChart({ window: w, height = 380, yearMae }: { window: HeroWi
             )}
             <span className="grow small">
               {w.days.length === 1 ? "This day" : `These ${w.days.length} days`}: MAE {w.stats.mae != null ? fmtNum(w.stats.mae, 1) : "–"} €/MWh
-              {yearMae != null && <>, over the whole eval year {fmtNum(yearMae, 2)}</>}
+              {yearMae != null && <>; the {modelLabel} over the whole eval year: {fmtNum(yearMae, 2)}</>}
               {w.stats.coverage != null && <> · {fmtNum(w.stats.coverage * 100, 0)}% of hours inside the band</>}
             </span>
           </>
@@ -95,9 +109,11 @@ export function HeroChart({ window: w, height = 380, yearMae }: { window: HeroWi
             <span className="val" style={{ color: "var(--volt)" }}>
               Forecast <b style={{ color: "var(--volt)" }}>{predAt == null ? "–" : `${fmtPrice(predAt, 1)} €/MWh`}</b>
             </span>
-            <span className="val">
-              Band <b>{lo == null || hi == null ? "–" : `${fmtNum(lo, 0)} to ${fmtNum(hi, 0)}`}</b>
-            </span>
+            {hasBand && (
+              <span className="val">
+                Band <b>{lo == null || hi == null ? "–" : `${fmtNum(lo, 0)} to ${fmtNum(hi, 0)}`}</b>
+              </span>
+            )}
             {actualAt != null && predAt != null && (
               <span className="val">
                 Error <b>{fmtSigned(predAt - actualAt, 1)}</b>
@@ -190,9 +206,11 @@ export function HeroChart({ window: w, height = 380, yearMae }: { window: HeroWi
               />
             ))}
 
-            <g className="wipe" style={{ ["--delay" as string]: "0ms" }}>
-              <path d={bandPath(w.q90, w.q10, x, y)} fill="var(--volt)" opacity={0.14} />
-            </g>
+            {hasBand && (
+              <g className="wipe" style={{ ["--delay" as string]: "0ms" }}>
+                <path d={bandPath(w.q90, w.q10, x, y)} fill="var(--volt)" opacity={0.14} />
+              </g>
+            )}
             <path
               className="draw"
               pathLength={1}
@@ -201,7 +219,7 @@ export function HeroChart({ window: w, height = 380, yearMae }: { window: HeroWi
               stroke="var(--c-actual)"
               strokeWidth={1.75}
               strokeLinejoin="round"
-              style={{ ["--delay" as string]: "450ms" }}
+              style={{ ["--delay" as string]: "200ms" }}
             />
             <path
               className="draw"
@@ -212,7 +230,7 @@ export function HeroChart({ window: w, height = 380, yearMae }: { window: HeroWi
               strokeWidth={2.75}
               strokeLinejoin="round"
               strokeLinecap="round"
-              style={{ ["--delay" as string]: "150ms" }}
+              style={{ ["--delay" as string]: "80ms" }}
             />
 
             {h != null && (

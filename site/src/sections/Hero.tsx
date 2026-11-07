@@ -49,6 +49,21 @@ function useHeroDays(): number {
   return days;
 }
 
+/** Short wide windows (a 960 x 540 laptop): a lower chart, so its x axis and the
+ *  note below it fit one screen once the headline has scrolled away. */
+function useShortWindow(): boolean {
+  const [short, setShort] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia("(min-width: 901px) and (max-height: 640px)");
+    const apply = () => setShort(mq.matches);
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, []);
+  return short;
+}
+
 export function Hero({
   forecast,
   health,
@@ -59,39 +74,55 @@ export function Hero({
   ledger: Loadable<ForwardLedgerData>;
 }) {
   const days = useHeroDays();
+  const short = useShortWindow();
   const ready = forecast.state === "ready" ? forecast.data : null;
-  const win = ready ? pickHeroWindow(ready.recent, days) : null;
-  const nHours = ready?.eval.models.lgbm_point?.n;
+  const figure = ready ? headlineFigure(ready.eval) : null;
+  // The chart shows the model the headline is about. The p10-p90 band belongs to the
+  // full model, so it goes with it rather than hanging over the wrong line.
+  const preSeries = ready?.recent.predicted_pre_auction;
+  const recent =
+    ready && figure && preSeries
+      ? {
+          ...ready.recent,
+          predicted: preSeries,
+          q10: preSeries.map(() => null),
+          q90: preSeries.map(() => null),
+        }
+      : (ready?.recent ?? null);
+  const win = recent ? pickHeroWindow(recent, days) : null;
+  const chartIsPre = Boolean(ready && figure && preSeries);
+  const nHours = ready?.eval.pre_auction?.n ?? ready?.eval.models.lgbm_point?.n;
   const led = ledger.state === "ready" ? ledger.data : null;
   const tomorrow = liveTomorrow(led);
   const recording = hasRecordedForecasts(led);
-  const figure = ready ? headlineFigure(ready.eval) : null;
 
   return (
     <section className="hero" id="top" aria-label="Forecast against cleared prices">
       <div className="wrap">
         <div className="hero-head">
-          {tomorrow ? (
-            <h1>Tomorrow&apos;s German power price, forecast before the auction closes.</h1>
-          ) : (
-            <h1>
-              Germany&apos;s <span className="nb">day-ahead</span> power price, forecast hour by hour and scored against
-              what cleared.
-            </h1>
-          )}
-          <div>
+          <div className="hero-main">
+            {tomorrow ? (
+              <h1>Tomorrow&apos;s German power price, forecast before the auction closes.</h1>
+            ) : (
+              <h1>
+                Germany&apos;s <span className="nb">day-ahead</span> power price, forecast hour by hour and scored
+                against what cleared.
+              </h1>
+            )}
             {figure && (
-              <Reveal className="hero-figure">
+              <div className="hero-figure">
                 <div className="num">
-                  <CountUp value={figure.pct} digits={1} active delayMs={250} />
+                  <CountUp value={figure.pct} digits={1} active duration={650} />
                   <small>%</small>
                 </div>
                 <p>
                   less error than yesterday&apos;s prices, using only what exists before the auction: MAE{" "}
                   {fmtNum(figure.mae, 2)} against {fmtNum(figure.naiveMae, 2)} €/MWh, out-of-sample.
                 </p>
-              </Reveal>
+              </div>
             )}
+          </div>
+          <div>
             <p className="lede">
               A LightGBM forecast
               {ready && nHours
@@ -115,11 +146,17 @@ export function Hero({
 
         {win ? (
           <>
-            <HeroChart window={win} height={days === 2 ? 320 : 380} yearMae={ready?.eval.models.lgbm_point?.mae} />
+            <HeroChart
+              window={win}
+              height={days === 2 ? 320 : short ? 300 : 380}
+              yearMae={chartIsPre ? figure?.mae : ready?.eval.models.lgbm_point?.mae}
+              modelLabel={chartIsPre ? "pre-auction model" : "full model"}
+            />
             <p className="small" style={{ marginTop: 12, maxWidth: "76ch" }}>
-              Backtest, not live: the last {win.days.length} complete delivery days of the walk-forward evaluation. The
-              forecast is the full model, which assumes the TSOs&apos; generation forecast for the delivery day is
-              known; the band is its raw p10 to p90.
+              Backtest, not live: the last {win.days.length} complete delivery days of the walk-forward evaluation.{" "}
+              {chartIsPre
+                ? "The forecast is the strictly pre-auction model, the one in the headline. The p10 to p90 band below belongs to the full model and is not drawn here."
+                : "The forecast is the full model, which assumes the TSOs' generation forecast for the delivery day is known; the band is its raw p10 to p90."}
             </p>
           </>
         ) : null}

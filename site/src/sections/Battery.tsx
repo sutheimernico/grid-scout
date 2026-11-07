@@ -1,15 +1,17 @@
 import { LineChart } from "../charts/LineChart";
 import { fmtMonthYear, fmtNum, fmtPct, fmtSigned } from "../lib/format";
-import { revenueSplit, splitWidths, type RevenueSplit } from "../lib/battery";
+import { fullModelEdge, revenueSplit, splitWidths, type RevenueSplit } from "../lib/battery";
 import { sensitivityMatrix } from "../lib/sensitivity";
 import type { BatteryData, BatterySensitivity } from "../types";
 import { Reveal } from "../ui";
 
-const kFmt = (v: number) => `${Math.round(v / 1000)}k`;
+const kFmt = (v: number) => (v === 0 ? "0" : `${Math.round(v / 1000)}k`);
 
 export function Battery({ data }: { data: BatteryData }) {
   const s = data.summary;
   const split = revenueSplit(s);
+  const fullEdge = fullModelEdge(s);
+  const preAuction = s.forecast === "pred_point_pre_auction";
   const months = data.daily.days.map(fmtMonthYear);
   return (
     <section className="band plate" id="battery" aria-label="Battery arbitrage backtest">
@@ -17,7 +19,8 @@ export function Battery({ data }: { data: BatteryData }) {
         <div className="split wide-left">
           <Reveal>
             <p className="small" style={{ marginBottom: 6 }}>
-              What the forecast adds to a {s.battery.power_mw} MW / {s.battery.capacity_mwh} MWh battery
+              What {preAuction ? "the pre-auction forecast" : "the forecast"} adds to a {s.battery.power_mw} MW /{" "}
+              {s.battery.capacity_mwh} MWh battery
               {split.edgePct != null ? `: ${fmtSigned(split.edgePct, 1)}% over a naive forecast` : ""}
             </p>
             <div className="big-figure">
@@ -25,19 +28,20 @@ export function Battery({ data }: { data: BatteryData }) {
               <small>€ a year</small>
             </div>
             <p className="small" style={{ marginTop: 10 }}>
-              Full model: assumes the TSOs&apos; generation forecast for the delivery day is known.
+              Annualised from {s.n_days} backtest days.
+              {fullEdge != null &&
+                ` With the full model, whose input (the TSOs' generation forecast for the delivery day) is only published after the auction, the edge would be ${fmtSigned(fullEdge)} € a year.`}
             </p>
             <h2 style={{ marginTop: 18, maxWidth: "26ch" }}>
               Most of the revenue is the battery, not the forecast
             </h2>
             <p className="note" style={{ marginTop: 16 }}>
               Even the naive forecast earns {fmtNum(split.naive)} € a year, because a battery that charges at night and
-              discharges in the evening captures most of the daily spread. The forecast's value is the difference to
+              discharges in the evening captures most of the daily spread. The forecast&apos;s value is the difference to
               that: {fmtSigned(split.edge)} €, and {fmtPct(s.capture_rate_model)} of perfect foresight instead of{" "}
               {fmtPct(s.capture_rate_naive)}. One cycle per day, {fmtNum(s.battery.round_trip_efficiency * 100, 0)}%
-              round-trip efficiency, schedules from an exact LP, same year as the forecast eval. Gross revenue, no grid
-              fees or degradation. The schedules use the full model's forecasts (TSO generation forecast assumed
-              known); this backtest has not been re-run on pre-auction forecasts.
+              round-trip efficiency, schedules from an exact LP, same days as the forecast eval. Gross revenue, no grid
+              fees or degradation. All € figures here are per year, scaled from {s.n_days} days like the sweep below.
             </p>
           </Reveal>
           <Reveal>
@@ -47,14 +51,15 @@ export function Battery({ data }: { data: BatteryData }) {
 
         <Reveal className="chart-block">
           <p className="subhead" style={{ marginTop: "clamp(40px, 6vw, 72px)" }}>
-            Cumulative revenue over the eval year, € (daily day-ahead schedules evaluated at actual prices)
+            Cumulative revenue over the {s.n_days} backtest days, € (daily day-ahead schedules evaluated at actual prices, not annualised)
           </p>
           <LineChart
-            height={330}
+            height={280}
             endLabels
+            monthTicks
             series={[
               { key: "perfect", label: "Perfect", color: "var(--ink-muted)", values: data.daily.cumulative_perfect, dashed: true },
-              { key: "model", label: "Model", color: "var(--volt)", values: data.daily.cumulative_model, width: 3 },
+              { key: "model", label: "Forecast", color: "var(--volt)", values: data.daily.cumulative_model, width: 3 },
               { key: "naive", label: "Naive", color: "var(--naive)", values: data.daily.cumulative_naive, width: 2 },
             ]}
             fillBetween={{ upper: "model", lower: "naive", color: "var(--volt)" }}
@@ -64,7 +69,7 @@ export function Battery({ data }: { data: BatteryData }) {
           />
           <div className="legend">
             <span className="item">
-              <span className="swatch line" style={{ background: "var(--volt)" }} /> Model forecast
+              <span className="swatch line" style={{ background: "var(--volt)" }} /> {preAuction ? "Pre-auction forecast" : "Model forecast"}
             </span>
             <span className="item">
               <span className="swatch line" style={{ background: "var(--naive)" }} /> Naive forecast
@@ -95,7 +100,7 @@ function Sensitivity({ sweep }: { sweep?: BatterySensitivity }) {
         <h3>Does the edge depend on the battery?</h3>
         <p className="note">
           Same {sweep.n_days} days, same LP, only the battery changes ({sweep.power_mw} MW, one cycle per day; the
-          headline battery above is 86% / 2 h).{" "}
+          headline battery above is 86% / 2 h; every figure is € per MW and year, annualised from those days like the headline).{" "}
           {m.beatsEverywhere
             ? `The model beats naive in all ${sweep.cells.length} configurations, by ${fmtNum(m.edgeMin)}–${fmtNum(m.edgeMax)} €/MW/yr.`
             : `The model does not beat naive in every configuration (edge ${fmtSigned(m.edgeMin)} to ${fmtNum(m.edgeMax)} €/MW/yr).`}

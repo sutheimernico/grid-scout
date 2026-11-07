@@ -1,5 +1,5 @@
 import { useId, useMemo, useRef, useState } from "react";
-import { bandPath, extent, linePath, linearScale, spreadLabels, ticks } from "./scale";
+import { bandPath, extent, linePath, linearScale, monthTickIndices, spreadLabels, ticks } from "./scale";
 import { useChartWidth } from "../lib/useChartWidth";
 
 export interface LineSeries {
@@ -18,6 +18,8 @@ interface Props {
   unit: string;
   formatValue?: (v: number) => string;
   xTickEvery?: number;
+  /** xLabels are months: tick the first day of each month instead of every nth point */
+  monthTicks?: boolean;
   /** label each series at its last point, in its own colour (needs room on the right) */
   endLabels?: boolean;
   /** fill between two series (upper first) to show what separates them */
@@ -35,6 +37,7 @@ export function LineChart({
   unit,
   formatValue = (v) => v.toFixed(0),
   xTickEvery,
+  monthTicks = false,
   endLabels = false,
   fillBetween,
   negativeColor,
@@ -60,7 +63,9 @@ export function LineChart({
   }, [series, n, innerH, innerW, margin.top, margin.left]);
 
   const step = xTickEvery ?? Math.max(1, Math.round(n / Math.max(2, Math.min(7, Math.floor(WIDTH / 120)))));
-  const xTickIdx = Array.from({ length: n }, (_, i) => i).filter((i) => i % step === 0);
+  const xTickIdx = monthTicks
+    ? monthTickIndices(xLabels, innerW)
+    : Array.from({ length: n }, (_, i) => i).filter((i) => i % step === 0);
 
   function onMove(e: React.MouseEvent<SVGSVGElement>) {
     const rect = e.currentTarget.getBoundingClientRect();
