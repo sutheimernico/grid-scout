@@ -37,15 +37,27 @@ class BacktestResult:
             "capture_rate_model": round(float(totals["model"] / totals["perfect"]), 4),
             "capture_rate_naive": round(float(totals["naive"] / totals["perfect"]), 4),
             "model_edge_over_naive_eur": round(float(totals["model"] - totals["naive"]), 2),
+            "model_edge_over_naive_eur_per_mw_year": round(
+                float(totals["model"] - totals["naive"]) * annualize / self.battery.power_mw, 2
+            ),
         }
 
 
-def frames_from_predictions(predictions: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Walk-forward predictions -> (actual, model forecast) price frames."""
+def frames_from_predictions(
+    predictions: pd.DataFrame, forecast_col: str = "pred_point"
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Walk-forward predictions -> (actual, forecast) price frames.
+
+    `forecast_col` picks which model's forecast is scheduled: "pred_point" is the
+    full model (uses the TSO generation forecast for the delivery day, published
+    after the auction), "pred_point_pre_auction" the one that only sees what
+    exists at 12:00. Hours without a forecast (the pre-auction run has none for
+    its first day) are dropped, so run_backtest skips and counts those days.
+    """
     frame = predictions.assign(local_day=pd.to_datetime(predictions["local_day"]).dt.date)
     actual = frame.rename(columns={"target": "price"})[["local_day", "hour_local", "price"]]
-    model = actual.assign(price=frame["pred_point"].to_numpy())
-    return actual, model
+    forecast = actual.assign(price=frame[forecast_col].to_numpy()).dropna(subset=["price"])
+    return actual, forecast
 
 
 def run_backtest(

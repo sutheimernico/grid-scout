@@ -91,3 +91,23 @@ class TestSweep:
             assert cells[(0.85, d)] < cells[(0.90, d)] < cells[(0.95, d)]
         for e in EFFICIENCIES:
             assert cells[(e, 2)] < cells[(e, 4)]
+
+
+class TestForecastColumn:
+    def test_picks_the_requested_forecast_and_drops_hours_without_one(self):
+        day1, day2 = date(2025, 1, 1), date(2025, 1, 2)
+        frame = predictions({day1: DAY, day2: DAY}, {day1: DAY, day2: DAY})
+        frame["pred_point_pre_auction"] = [np.nan] * 8 + [1.0] * 8  # none for the first day
+        _, full = frames_from_predictions(frame)
+        _, pre = frames_from_predictions(frame, "pred_point_pre_auction")
+        assert len(full) == 16
+        assert set(pre["local_day"]) == {day2} and (pre["price"] == 1.0).all()
+
+    def test_a_flat_forecast_earns_less_than_a_good_one(self):
+        days = {date(2025, 1, d): DAY for d in (1, 2, 3)}
+        frame = predictions(days, days)
+        frame["pred_point_pre_auction"] = 50.0  # no spread seen, nothing to arbitrage
+        for col, expect_capture in (("pred_point", 1.0), ("pred_point_pre_auction", 0.0)):
+            actual, model = frames_from_predictions(frame, col)
+            capture = run_backtest(actual, model).summary["capture_rate_model"]
+            assert capture == pytest.approx(expect_capture, abs=1e-3)

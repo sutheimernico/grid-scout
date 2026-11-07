@@ -88,11 +88,17 @@ def battery_backtest(
     from gridscout.battery.backtest import frames_from_predictions, run_backtest
     from gridscout.battery.schedule import Battery
 
-    actual, model = frames_from_predictions(pd.read_parquet(_predictions_path(reports_dir)))
+    predictions = pd.read_parquet(_predictions_path(reports_dir))
     battery = Battery(
         power_mw=power_mw, capacity_mwh=capacity_mwh, round_trip_efficiency=efficiency
     )
+    # Headline: the forecast that only sees what exists before the auction.
+    actual, model = frames_from_predictions(predictions, "pred_point_pre_auction")
     result = run_backtest(actual, model, battery)
+    # Second number: the full model, on exactly the same days so the two are comparable.
+    _, full = frames_from_predictions(predictions, "pred_point")
+    full = full[full["local_day"].isin(set(model["local_day"]))]
+    full_summary = run_backtest(actual, full, battery).summary
     out = {
         # Health monitoring reads this back: an un-stamped report cannot be told
         # apart from a stale one (git does not preserve mtimes).
@@ -102,7 +108,17 @@ def battery_backtest(
             "capacity_mwh": capacity_mwh,
             "round_trip_efficiency": efficiency,
         },
+        "forecast": "pred_point_pre_auction",
         **result.summary,
+        "full_model": {
+            "forecast": "pred_point",
+            "revenue_eur_model": full_summary["revenue_eur"]["model"],
+            "capture_rate_model": full_summary["capture_rate_model"],
+            "model_edge_over_naive_eur": full_summary["model_edge_over_naive_eur"],
+            "model_edge_over_naive_eur_per_mw_year": full_summary[
+                "model_edge_over_naive_eur_per_mw_year"
+            ],
+        },
     }
     (reports_dir / "battery_backtest.json").write_text(json.dumps(out, indent=2) + "\n")
     result.daily.assign(local_day=result.daily["local_day"].astype(str)).to_parquet(
@@ -123,9 +139,12 @@ def battery_sensitivity(
     from gridscout.battery.backtest import frames_from_predictions
     from gridscout.battery.sensitivity import sweep
 
-    actual, model = frames_from_predictions(pd.read_parquet(_predictions_path(reports_dir)))
+    actual, model = frames_from_predictions(
+        pd.read_parquet(_predictions_path(reports_dir)), "pred_point_pre_auction"
+    )
     out = {
         "generated_utc": datetime.now(UTC).isoformat(timespec="seconds"),
+        "forecast": "pred_point_pre_auction",
         **sweep(actual, model),
     }
     (reports_dir / "battery_sensitivity.json").write_text(json.dumps(out, indent=2) + "\n")

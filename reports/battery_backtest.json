@@ -1,23 +1,32 @@
 {
-  "generated_utc": "2026-10-28T13:47:06+00:00",
+  "generated_utc": "2026-11-07T01:27:00+00:00",
   "battery": {
     "power_mw": 1.0,
     "capacity_mwh": 2.0,
     "round_trip_efficiency": 0.86
   },
+  "forecast": "pred_point_pre_auction",
   "n_days": 363,
   "revenue_eur": {
     "perfect": 85860.97,
-    "model": 80831.62,
+    "model": 78208.4,
     "naive": 76493.57
   },
   "revenue_eur_per_mw_year": {
     "perfect": 86334.03,
-    "model": 81276.97,
+    "model": 78639.3,
     "naive": 76915.02
   },
-  "capture_rate_model": 0.9414,
+  "capture_rate_model": 0.9109,
   "capture_rate_naive": 0.8909,
-  "model_edge_over_naive_eur": 4338.04,
-  "skipped_days": 2
+  "model_edge_over_naive_eur": 1714.83,
+  "model_edge_over_naive_eur_per_mw_year": 1724.28,
+  "skipped_days": 2,
+  "full_model": {
+    "forecast": "pred_point",
+    "revenue_eur_model": 80831.62,
+    "capture_rate_model": 0.9414,
+    "model_edge_over_naive_eur": 4338.04,
+    "model_edge_over_naive_eur_per_mw_year": 4361.95
+  }
 }
