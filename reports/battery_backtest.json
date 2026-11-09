@@ -6,17 +6,17 @@
   },
   "n_days": 363,
   "revenue_eur": {
-    "perfect": 85975.01,
-    "model": 80245.96,
-    "naive": 76753.78
+    "perfect": 86665.31,
+    "model": 80907.19,
+    "naive": 77306.0
   },
   "revenue_eur_per_mw_year": {
-    "perfect": 86448.7,
-    "model": 80688.08,
-    "naive": 77176.67
+    "perfect": 87142.81,
+    "model": 81352.96,
+    "naive": 77731.93
   },
-  "capture_rate_model": 0.9334,
-  "capture_rate_naive": 0.8927,
-  "model_edge_over_naive_eur": 3492.17,
+  "capture_rate_model": 0.9336,
+  "capture_rate_naive": 0.892,
+  "model_edge_over_naive_eur": 3601.19,
   "skipped_days": 2
 }
