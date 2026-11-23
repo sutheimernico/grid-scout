@@ -1,5 +1,5 @@
 {
-  "generated_utc": "2026-11-16T09:38:29+00:00",
+  "generated_utc": "2026-11-23T10:46:19+00:00",
   "battery": {
     "power_mw": 1.0,
     "capacity_mwh": 2.0,
@@ -8,25 +8,25 @@
   "forecast": "pred_point_pre_auction",
   "n_days": 361,
   "revenue_eur": {
-    "perfect": 87282.62,
-    "model": 79947.14,
-    "naive": 77721.94
+    "perfect": 87457.75,
+    "model": 79576.01,
+    "naive": 77738.89
   },
   "revenue_eur_per_mw_year": {
-    "perfect": 88249.74,
-    "model": 80832.98,
-    "naive": 78583.12
+    "perfect": 88426.81,
+    "model": 80457.73,
+    "naive": 78600.26
   },
-  "capture_rate_model": 0.916,
-  "capture_rate_naive": 0.8905,
-  "model_edge_over_naive_eur": 2225.21,
-  "model_edge_over_naive_eur_per_mw_year": 2249.86,
+  "capture_rate_model": 0.9099,
+  "capture_rate_naive": 0.8889,
+  "model_edge_over_naive_eur": 1837.12,
+  "model_edge_over_naive_eur_per_mw_year": 1857.48,
   "skipped_days": 4,
   "full_model": {
     "forecast": "pred_point",
-    "revenue_eur_model": 81775.91,
-    "capture_rate_model": 0.9345,
-    "model_edge_over_naive_eur": 3862.95,
-    "model_edge_over_naive_eur_per_mw_year": 3884.23
+    "revenue_eur_model": 82140.12,
+    "capture_rate_model": 0.9368,
+    "model_edge_over_naive_eur": 4210.22,
+    "model_edge_over_naive_eur_per_mw_year": 4233.42
   }
 }
